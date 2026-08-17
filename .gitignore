@@ -1,0 +1,30 @@
+# Dependencies and build output
+/node_modules/
+/dist/
+/src-tauri/target/
+/coverage/
+/artifacts/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cer
+*.crt
+*.p12
+*.pfx
+
+# Logs, crash dumps, and local debug artifacts
+*.log
+*.dmp
+*.pdb
+*.stackdump
+
+# Editors and operating systems
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

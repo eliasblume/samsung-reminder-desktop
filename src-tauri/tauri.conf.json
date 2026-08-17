@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Reminder",
+  "version": "0.1.0",
+  "identifier": "io.github.eliasblume.samsung-reminder",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Reminder",
+        "width": 1220,
+        "height": 820,
+        "minWidth": 860,
+        "minHeight": 620,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "backgroundColor": "#08090A"
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "font-src": "'self'",
+        "img-src": "'self' asset: http://asset.localhost data: blob:",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "eliasblume",
+    "copyright": "Copyright © 2026 eliasblume",
+    "homepage": "https://github.com/eliasblume/samsung-reminder-desktop",
+    "resources": [
+      "../LICENSE",
+      "../LEGAL.md",
+      "../THIRD_PARTY_NOTICES.md"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Samsung Reminder on Windows",
+    "longDescription": "A Samsung One UI inspired desktop client for Samsung Reminder.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
+  }
+}

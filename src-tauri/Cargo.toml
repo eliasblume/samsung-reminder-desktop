@@ -1,0 +1,46 @@
+[package]
+name = "samsung-reminder-desktop"
+version = "0.1.0"
+description = "Samsung Reminder desktop client and MCP bridge"
+license = "MIT"
+repository = "https://github.com/eliasblume/samsung-reminder-desktop"
+homepage = "https://github.com/eliasblume/samsung-reminder-desktop"
+readme = "../README.md"
+rust-version = "1.85"
+edition = "2021"
+default-run = "samsung-reminder-desktop"
+
+[lib]
+name = "samsung_reminder_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "samsung-reminder-desktop"
+path = "src/main.rs"
+
+[[bin]]
+name = "samsung-reminder-mcp"
+path = "src/bin/samsung-reminder-mcp.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+chrono = "0.4"
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "process", "rt-multi-thread", "time"] }
+tokio-tungstenite = { version = "0.27", features = ["rustls-tls-native-roots"] }
+urlencoding = "2"
+uuid = { version = "1", features = ["v4"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Credentials", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
