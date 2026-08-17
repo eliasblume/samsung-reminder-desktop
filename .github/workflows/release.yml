@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-windows:
+  build_windows:
     runs-on: windows-2025
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -112,7 +112,7 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: build-windows
+    needs: build_windows
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -140,8 +140,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.sha }}
-          VERSION: ${{ needs.build-windows.outputs.version }}
-          TAG: ${{ needs.build-windows.outputs.tag }}
+          VERSION: ${{ needs.build_windows.outputs.version }}
+          TAG: ${{ needs.build_windows.outputs.tag }}
         run: |
           git fetch origin main --tags
           if ((git rev-parse origin/main).Trim() -ne $env:SOURCE_SHA) {
@@ -169,7 +169,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.build-windows.outputs.tag }}
+          TAG: ${{ needs.build_windows.outputs.tag }}
         run: |
           $assets = @(Get-ChildItem -LiteralPath release -File | ForEach-Object FullName)
           gh release create $env:TAG @assets --draft --verify-tag --title "Reminder $env:TAG" --generate-notes
@@ -180,7 +180,7 @@ jobs:
       - name: Write release summary
         shell: pwsh
         env:
-          TAG: ${{ needs.build-windows.outputs.tag }}
+          TAG: ${{ needs.build_windows.outputs.tag }}
         run: |
           "## Reminder $env:TAG" >> $env:GITHUB_STEP_SUMMARY
           'Published NSIS, MSI, portable ZIP, SHA-256, MCP, and Scoop manifest artifacts.' >> $env:GITHUB_STEP_SUMMARY
