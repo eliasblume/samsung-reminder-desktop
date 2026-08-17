@@ -9,7 +9,7 @@ An unofficial Samsung One UI-inspired desktop client and local MCP server for re
 
 For a prebuilt release:
 
-- 64-bit Windows 10 version 1809 or newer, or Windows 11. Development and release testing currently target Windows 11 x64.
+- 64-bit Windows 10 version 1809 or newer, or Windows 11, on x64 or ARM64. Release CI builds and tests both architectures natively.
 - [Samsung Browser for Windows](https://browser.samsung.com/) installed using Samsung's official 64-bit installer.
 - A Samsung Account signed in through Samsung Browser. Open the browser at least once so it creates the default profile.
 - Network access to Samsung Cloud. The installer may also download Microsoft Edge WebView2 when it is unavailable.
@@ -21,7 +21,7 @@ This project currently expects Samsung's standard system-wide installation and d
 
 Custom installation and profile locations are not currently detected. Samsung Browser must be completely closed before the first sync. Chromium otherwise routes the helper launch into the existing process without enabling the private localhost bridge. After the app has cached a valid credential, normal Reminder operations no longer keep the browser open.
 
-Samsung currently offers separate official [x64](https://browser.samsung.com/media/x64_SamsungBrowserSetup.exe) and [ARM64](https://browser.samsung.com/media/arm64_SamsungBrowserSetup.exe) evergreen installers. This project publishes x64 builds only for now.
+Samsung currently offers separate official [x64](https://browser.samsung.com/media/x64_SamsungBrowserSetup.exe) and [ARM64](https://browser.samsung.com/media/arm64_SamsungBrowserSetup.exe) evergreen installers. This project publishes matching x64 and ARM64 app builds.
 
 ## Install
 

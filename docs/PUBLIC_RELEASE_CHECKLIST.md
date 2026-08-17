@@ -12,16 +12,16 @@ This checklist records the source and release controls used for the initial publ
 - [x] Live Samsung collections and account probes cannot mount before explicit first-run consent.
 - [x] Dependency locks, pinned CI actions, fixed Rust toolchain, RustSec audit, and Dependabot configuration are committed.
 - [x] Third-party notices, provenance, security boundaries, and private-interface caveats are documented.
-- [x] CI checks frontend types/build output plus Rust formatting, linting, and tests on Windows x64.
+- [x] CI checks frontend types/build output plus Rust formatting, linting, and tests on Windows x64; release CI repeats the Rust gates on native x64 and ARM64 runners.
 
 ## Release checks
 
-- [x] The workflow builds NSIS, MSI, portable, MCP, checksum, and Scoop artifacts from the same tested version.
+- [x] The workflow builds x64 and ARM64 NSIS, MSI, portable, MCP, checksum, and Scoop artifacts from the same tested version.
 - [x] A read-only build job is separated from the write-capable publish job.
 - [x] The publish job refuses to release if `main` changed during the build.
 - [x] The Scoop manifest is generated from the final portable ZIP hash.
 - [ ] Add Authenticode signing when a protected signing identity is available. Until then, releases must state that Windows may show an unknown-publisher warning.
-- [ ] Smoke-test portable install, update, and uninstall on a clean Windows x64 machine for each release.
+- [ ] Smoke-test portable install, update, and uninstall on clean Windows x64 and ARM64 machines for each release.
 
 ## Owner decisions and ongoing risk
 

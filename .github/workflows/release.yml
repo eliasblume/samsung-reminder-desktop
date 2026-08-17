@@ -23,11 +23,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build_windows:
-    runs-on: windows-2025
+  prepare:
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Check out main with tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = ./scripts/bump-version.ps1 -Part '${{ inputs.bump }}'
+          if (git tag --list "v$version") {
+            throw "Tag v$version already exists. Choose a SemVer bump."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+  build_windows:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: windows-2025
+            rust_target: x86_64-pc-windows-msvc
+          - architecture: arm64
+            runner: windows-11-arm
+            rust_target: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out main with tags
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,16 +77,21 @@ jobs:
       - name: Install pinned Rust checks
         run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt,clippy
 
-      - name: Select release version
-        id: version
+      - name: Verify native Rust architecture
+        shell: pwsh
+        run: |
+          $hostTriple = rustc +1.97.1 -vV | Select-String '^host:' | ForEach-Object { $_.Line.Split(':', 2)[1].Trim() }
+          if ($hostTriple -ne '${{ matrix.rust_target }}') {
+            throw "Expected Rust host ${{ matrix.rust_target }}, received $hostTriple."
+          }
+
+      - name: Apply prepared release version
         shell: pwsh
         run: |
           $version = ./scripts/bump-version.ps1 -Part '${{ inputs.bump }}'
-          if (git tag --list "v$version") {
-            throw "Tag v$version already exists. Choose a SemVer bump."
+          if ($version -ne '${{ needs.prepare.outputs.version }}') {
+            throw "Prepared version ${{ needs.prepare.outputs.version }} differs from $version."
           }
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "tag=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
@@ -83,27 +119,28 @@ jobs:
 
       - name: Prepare portable and Scoop artifacts
         shell: pwsh
-        run: ./scripts/prepare-release.ps1 -Version '${{ steps.version.outputs.version }}' -Repository '${{ github.repository }}'
+        run: ./scripts/prepare-release.ps1 -Version '${{ needs.prepare.outputs.version }}' -Repository '${{ github.repository }}' -Architecture '${{ matrix.architecture }}'
 
       - name: Stage release metadata
+        if: matrix.architecture == 'x64'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force release-state/src-tauri, release-state/bucket | Out-Null
+          New-Item -ItemType Directory -Force release-state/src-tauri | Out-Null
           Copy-Item package.json release-state/package.json
           Copy-Item src-tauri/Cargo.toml release-state/src-tauri/Cargo.toml
           Copy-Item src-tauri/Cargo.lock release-state/src-tauri/Cargo.lock
           Copy-Item src-tauri/tauri.conf.json release-state/src-tauri/tauri.conf.json
-          Copy-Item bucket/samsung-reminder.json release-state/bucket/samsung-reminder.json
 
-      - name: Upload release artifacts
+      - name: Upload architecture release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: windows-release
+          name: windows-release-${{ matrix.architecture }}
           path: artifacts/*
           if-no-files-found: error
           retention-days: 7
 
       - name: Upload release metadata
+        if: matrix.architecture == 'x64'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-state
@@ -112,7 +149,7 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: build_windows
+    needs: [prepare, build_windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -123,11 +160,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Download release artifacts
+      - name: Download x64 release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: windows-release
-          path: release
+          name: windows-release-x64
+          path: release/x64
+
+      - name: Download ARM64 release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: windows-release-arm64
+          path: release/arm64
 
       - name: Download release metadata
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -135,13 +178,21 @@ jobs:
           name: release-state
           path: release-state
 
+      - name: Merge Scoop architecture manifests
+        shell: pwsh
+        run: |
+          ./scripts/merge-scoop-manifests.ps1 `
+            -X64Manifest release/x64/samsung-reminder-x64.json `
+            -Arm64Manifest release/arm64/samsung-reminder-arm64.json `
+            -OutputPath bucket/samsung-reminder.json
+
       - name: Commit and tag the tested release state
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.sha }}
-          VERSION: ${{ needs.build_windows.outputs.version }}
-          TAG: ${{ needs.build_windows.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           git fetch origin main --tags
           if ((git rev-parse origin/main).Trim() -ne $env:SOURCE_SHA) {
@@ -152,8 +203,6 @@ jobs:
           Copy-Item release-state/src-tauri/Cargo.toml src-tauri/Cargo.toml
           Copy-Item release-state/src-tauri/Cargo.lock src-tauri/Cargo.lock
           Copy-Item release-state/src-tauri/tauri.conf.json src-tauri/tauri.conf.json
-          New-Item -ItemType Directory -Force bucket | Out-Null
-          Copy-Item release-state/bucket/samsung-reminder.json bucket/samsung-reminder.json
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -169,9 +218,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.build_windows.outputs.tag }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          $assets = @(Get-ChildItem -LiteralPath release -File | ForEach-Object FullName)
+          $assets = @(Get-ChildItem -LiteralPath release -Recurse -File |
+            Where-Object Name -NotMatch '^samsung-reminder-(x64|arm64)\.json$' |
+            ForEach-Object FullName)
+          $assets += (Resolve-Path bucket/samsung-reminder.json).Path
           gh release create $env:TAG @assets --draft --verify-tag --title "Reminder $env:TAG" --generate-notes
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
           gh release edit $env:TAG --draft=false --latest
@@ -180,7 +232,7 @@ jobs:
       - name: Write release summary
         shell: pwsh
         env:
-          TAG: ${{ needs.build_windows.outputs.tag }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           "## Reminder $env:TAG" >> $env:GITHUB_STEP_SUMMARY
-          'Published NSIS, MSI, portable ZIP, SHA-256, MCP, and Scoop manifest artifacts.' >> $env:GITHUB_STEP_SUMMARY
+          'Published x64 and ARM64 NSIS, MSI, portable ZIP, SHA-256, MCP, and Scoop artifacts.' >> $env:GITHUB_STEP_SUMMARY

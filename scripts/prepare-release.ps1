@@ -8,6 +8,10 @@ param(
     [ValidatePattern('^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')]
     [string]$Repository,
 
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('x64', 'arm64')]
+    [string]$Architecture,
+
     [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
     [string]$OutputDirectory = (Join-Path $Root 'artifacts')
 )
@@ -63,7 +67,7 @@ if (Test-Path -LiteralPath $outputPath) {
 }
 New-Item -ItemType Directory -Path $outputPath | Out-Null
 
-$portableName = "Samsung-Reminder-$Version-windows-x64"
+$portableName = "Samsung-Reminder-$Version-windows-$Architecture"
 $portableDirectory = Join-Path $outputPath $portableName
 New-Item -ItemType Directory -Path $portableDirectory | Out-Null
 Copy-Item -LiteralPath $appExecutable -Destination (Join-Path $portableDirectory 'Reminder.exe')
@@ -85,13 +89,14 @@ $hashFile = "$portableArchive.sha256"
     [Text.UTF8Encoding]::new($false)
 )
 
-$nsisDestination = Join-Path $outputPath "Samsung-Reminder-$Version-windows-x64-setup.exe"
-$msiDestination = Join-Path $outputPath "Samsung-Reminder-$Version-windows-x64.msi"
+$nsisDestination = Join-Path $outputPath "Samsung-Reminder-$Version-windows-$Architecture-setup.exe"
+$msiDestination = Join-Path $outputPath "Samsung-Reminder-$Version-windows-$Architecture.msi"
 Copy-SingleBundle -Directory (Join-Path $releaseDirectory 'bundle\nsis') -Filter '*.exe' -Destination $nsisDestination
 Copy-SingleBundle -Directory (Join-Path $releaseDirectory 'bundle\msi') -Filter '*.msi' -Destination $msiDestination
 
 $downloadUrl = "https://github.com/$Repository/releases/download/v$Version/$portableName.zip"
-$autoupdateUrl = "https://github.com/$Repository/releases/download/v`$version/Samsung-Reminder-`$version-windows-x64.zip"
+$autoupdateUrl = "https://github.com/$Repository/releases/download/v`$version/Samsung-Reminder-`$version-windows-$Architecture.zip"
+$scoopArchitecture = if ($Architecture -eq 'x64') { '64bit' } else { 'arm64' }
 $manifest = [ordered]@{
     version = $Version
     description = 'Unofficial Samsung Reminder desktop client and local MCP server'
@@ -102,7 +107,7 @@ $manifest = [ordered]@{
         'Download Samsung Browser from https://browser.samsung.com/ and sign in before the first sync.'
     )
     architecture = [ordered]@{
-        '64bit' = [ordered]@{
+        $scoopArchitecture = [ordered]@{
             url = $downloadUrl
             hash = $hash
         }
@@ -112,18 +117,15 @@ $manifest = [ordered]@{
     checkver = 'github'
     autoupdate = [ordered]@{
         architecture = [ordered]@{
-            '64bit' = [ordered]@{
+            $scoopArchitecture = [ordered]@{
                 url = $autoupdateUrl
             }
         }
     }
 }
 
-$bucketDirectory = Join-Path $rootPath 'bucket'
-New-Item -ItemType Directory -Path $bucketDirectory -Force | Out-Null
-$manifestPath = Join-Path $bucketDirectory 'samsung-reminder.json'
+$manifestPath = Join-Path $outputPath "samsung-reminder-$Architecture.json"
 $manifestJson = $manifest | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText($manifestPath, "$manifestJson`n", [Text.UTF8Encoding]::new($false))
-Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $outputPath 'samsung-reminder.json')
 
-Write-Output "Prepared release artifacts for v$Version."
+Write-Output "Prepared $Architecture release artifacts for v$Version."

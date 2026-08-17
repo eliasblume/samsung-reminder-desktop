@@ -70,8 +70,9 @@ function Set-CargoVersion {
 }
 
 $packagePath = Join-Path $Root 'package.json'
-$tauriPath = Join-Path $Root 'src-tauri\tauri.conf.json'
-$cargoPath = Join-Path $Root 'src-tauri\Cargo.toml'
+$srcTauriPath = Join-Path $Root 'src-tauri'
+$tauriPath = Join-Path $srcTauriPath 'tauri.conf.json'
+$cargoPath = Join-Path $srcTauriPath 'Cargo.toml'
 
 $versions = @(
     Read-JsonVersion -Path $packagePath
