@@ -27,6 +27,35 @@ function Assert-File {
     }
 }
 
+function Assert-PeExecutable {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][uint16]$ExpectedMachine,
+        [Parameter(Mandatory = $true)][uint16]$ExpectedSubsystem,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 256 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) {
+        throw "$Label is not a valid PE executable: $Path"
+    }
+    $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+    if ($peOffset -lt 0 -or $peOffset + 94 -ge $bytes.Length -or
+        $bytes[$peOffset] -ne 0x50 -or $bytes[$peOffset + 1] -ne 0x45 -or
+        $bytes[$peOffset + 2] -ne 0 -or $bytes[$peOffset + 3] -ne 0) {
+        throw "$Label has an invalid PE header: $Path"
+    }
+
+    $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+    $subsystem = [BitConverter]::ToUInt16($bytes, $peOffset + 24 + 68)
+    if ($machine -ne $ExpectedMachine) {
+        throw ('{0} uses PE machine 0x{1:X4}; expected 0x{2:X4}.' -f $Label, $machine, $ExpectedMachine)
+    }
+    if ($subsystem -ne $ExpectedSubsystem) {
+        throw "$Label uses PE subsystem $subsystem; expected $ExpectedSubsystem."
+    }
+}
+
 function Copy-SingleBundle {
     param(
         [Parameter(Mandatory = $true)][string]$Directory,
@@ -61,6 +90,10 @@ Assert-File -Path $licensePath
 Assert-File -Path $readmePath
 Assert-File -Path $legalPath
 Assert-File -Path $noticesPath
+
+$expectedMachine = if ($Architecture -eq 'x64') { [uint16]0x8664 } else { [uint16]0xaa64 }
+Assert-PeExecutable -Path $appExecutable -ExpectedMachine $expectedMachine -ExpectedSubsystem 2 -Label 'Reminder GUI'
+Assert-PeExecutable -Path $mcpExecutable -ExpectedMachine $expectedMachine -ExpectedSubsystem 3 -Label 'Reminder MCP server'
 
 if (Test-Path -LiteralPath $outputPath) {
     Remove-Item -LiteralPath $outputPath -Recurse -Force

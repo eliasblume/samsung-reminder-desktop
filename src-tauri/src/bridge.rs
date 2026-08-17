@@ -3,8 +3,9 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 #[cfg(target_os = "windows")]
@@ -32,6 +33,22 @@ const EXTENSION_RUNTIME: &str = include_str!("../reminder-runtime.js");
 static MANAGED_BROWSER_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static CREDENTIAL_CACHE: tokio::sync::RwLock<Option<CloudCredential>> =
     tokio::sync::RwLock::const_new(None);
+static BOOTSTRAP_FAILURE_GENERATION: AtomicU64 = AtomicU64::new(0);
+static LAST_BOOTSTRAP_FAILURE: tokio::sync::RwLock<Option<BootstrapFailure>> =
+    tokio::sync::RwLock::const_new(None);
+
+#[derive(Clone)]
+struct BootstrapFailure {
+    endpoint: String,
+    generation: u64,
+    message: String,
+}
+
+impl BootstrapFailure {
+    fn applies_to(&self, endpoint: &str, observed_generation: u64) -> bool {
+        self.endpoint == endpoint && self.generation > observed_generation
+    }
+}
 
 #[cfg(target_os = "windows")]
 fn wide_null(value: &str) -> Vec<u16> {
@@ -132,6 +149,7 @@ fn delete_persistent_credential() -> Result<(), String> {
 pub async fn clear_cached_credential() -> Result<(), String> {
     let _guard = MANAGED_BROWSER_LOCK.lock().await;
     *CREDENTIAL_CACHE.write().await = None;
+    *LAST_BOOTSTRAP_FAILURE.write().await = None;
     delete_persistent_credential()
 }
 
@@ -183,20 +201,32 @@ fn endpoint_port(endpoint: &str) -> u16 {
         .unwrap_or(9226)
 }
 
-fn trusted_profile() -> Result<PathBuf, String> {
-    let local_app_data = std::env::var_os("LOCALAPPDATA")
-        .ok_or_else(|| "Windows LocalAppData is unavailable.".to_string())?;
-    let path = PathBuf::from(local_app_data)
+fn trusted_profile_at(local_app_data: &Path) -> Result<PathBuf, String> {
+    let path = local_app_data
         .join("Samsung")
         .join("Internet")
         .join("User Data");
-    if !path.join("Default").is_dir() {
+    let initialized_file = |candidate: &Path| {
+        candidate
+            .metadata()
+            .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 2)
+    };
+    if !initialized_file(&path.join("Local State"))
+        || !path.join("Default").is_dir()
+        || !initialized_file(&path.join("Default").join("Preferences"))
+    {
         return Err(
             "SAMSUNG_PROFILE_NOT_READY: Open Samsung Browser once so its profile can be initialized, then retry."
                 .into(),
         );
     }
     Ok(path)
+}
+
+fn trusted_profile() -> Result<PathBuf, String> {
+    let local_app_data = std::env::var_os("LOCALAPPDATA")
+        .ok_or_else(|| "Windows LocalAppData is unavailable.".to_string())?;
+    trusted_profile_at(Path::new(&local_app_data))
 }
 
 #[cfg(target_os = "windows")]
@@ -222,11 +252,11 @@ fn hide_process_windows(pid: u32) {
 }
 
 #[cfg(target_os = "windows")]
-fn helper_process_ids() -> HashSet<u32> {
-    let mut ids = HashSet::new();
+fn helper_processes() -> Vec<(u32, u32)> {
+    let mut processes = Vec::new();
     let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snapshot == INVALID_HANDLE_VALUE {
-        return ids;
+        return processes;
     }
     let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
     entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
@@ -242,25 +272,50 @@ fn helper_process_ids() -> HashSet<u32> {
             name.as_str(),
             "samsunginternet.exe" | "samsung.browser.broker.exe"
         ) {
-            ids.insert(entry.th32ProcessID);
+            processes.push((entry.th32ProcessID, entry.th32ParentProcessID));
         }
         has_entry = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
     }
     unsafe {
         CloseHandle(snapshot);
     }
-    ids
+    processes
 }
 
 #[cfg(not(target_os = "windows"))]
-fn helper_process_ids() -> HashSet<u32> {
-    HashSet::new()
+fn helper_processes() -> Vec<(u32, u32)> {
+    Vec::new()
+}
+
+fn descendant_process_ids(root_pid: u32, processes: &[(u32, u32)]) -> HashSet<u32> {
+    let mut owned = HashSet::from([root_pid]);
+    loop {
+        let before = owned.len();
+        for (pid, parent_pid) in processes {
+            if owned.contains(parent_pid) {
+                owned.insert(*pid);
+            }
+        }
+        if owned.len() == before {
+            return owned;
+        }
+    }
+}
+
+fn helper_process_tree(root_pid: u32) -> HashSet<u32> {
+    descendant_process_ids(root_pid, &helper_processes())
+}
+
+fn hide_helper_process_tree(root_pid: u32) {
+    for pid in helper_process_tree(root_pid) {
+        hide_process_windows(pid);
+    }
 }
 
 #[cfg(target_os = "windows")]
-fn terminate_new_helper_processes(baseline: &HashSet<u32>) {
-    for pid in helper_process_ids().difference(baseline) {
-        let process = unsafe { OpenProcess(PROCESS_TERMINATE, 0, *pid) };
+fn terminate_helper_process_tree(root_pid: u32) {
+    for pid in helper_process_tree(root_pid) {
+        let process = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
         if process.is_null() {
             continue;
         }
@@ -272,7 +327,7 @@ fn terminate_new_helper_processes(baseline: &HashSet<u32>) {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn terminate_new_helper_processes(_baseline: &HashSet<u32>) {}
+fn terminate_helper_process_tree(_root_pid: u32) {}
 
 #[cfg(not(target_os = "windows"))]
 fn hide_process_windows(_pid: u32) {}
@@ -327,6 +382,7 @@ pub async fn run_managed_operation(
         return Err(format!("Unsupported Reminder operation: {operation}"));
     }
     let endpoint = normalize_endpoint(endpoint)?;
+    let observed_bootstrap_generation = BOOTSTRAP_FAILURE_GENERATION.load(Ordering::Acquire);
     let _guard = MANAGED_BROWSER_LOCK.lock().await;
     let cached_credential = { CREDENTIAL_CACHE.read().await.clone() };
     let mut credential = match cached_credential {
@@ -335,7 +391,9 @@ pub async fn run_managed_operation(
             let credential = match load_persistent_credential()? {
                 Some(credential) => credential,
                 None => {
-                    let credential = bootstrap_credential(&endpoint).await?;
+                    let credential =
+                        bootstrap_credential_for_request(&endpoint, observed_bootstrap_generation)
+                            .await?;
                     store_persistent_credential(&credential)?;
                     credential
                 }
@@ -358,7 +416,8 @@ pub async fn run_managed_operation(
         Err(CloudError::Unauthorized) => {
             *CREDENTIAL_CACHE.write().await = None;
             delete_persistent_credential()?;
-            let credential = bootstrap_credential(&endpoint).await?;
+            let credential =
+                bootstrap_credential_for_request(&endpoint, observed_bootstrap_generation).await?;
             store_persistent_credential(&credential)?;
             *CREDENTIAL_CACHE.write().await = Some(credential.clone());
             cloud::run_operation(credential, operation, args)
@@ -366,6 +425,33 @@ pub async fn run_managed_operation(
                 .map_err(CloudError::message)
         }
         Err(error) => Err(error.message()),
+    }
+}
+
+async fn bootstrap_credential_for_request(
+    endpoint: &str,
+    observed_generation: u64,
+) -> Result<CloudCredential, String> {
+    if let Some(failure) = LAST_BOOTSTRAP_FAILURE.read().await.clone() {
+        if failure.applies_to(endpoint, observed_generation) {
+            return Err(failure.message);
+        }
+    }
+
+    match bootstrap_credential(endpoint).await {
+        Ok(credential) => {
+            *LAST_BOOTSTRAP_FAILURE.write().await = None;
+            Ok(credential)
+        }
+        Err(message) => {
+            let generation = BOOTSTRAP_FAILURE_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+            *LAST_BOOTSTRAP_FAILURE.write().await = Some(BootstrapFailure {
+                endpoint: endpoint.to_string(),
+                generation,
+                message: message.clone(),
+            });
+            Err(message)
+        }
     }
 }
 
@@ -393,7 +479,6 @@ async fn bootstrap_credential(endpoint: &str) -> Result<CloudCredential, String>
     }
     let profile = trusted_profile()?;
     let port = endpoint_port(endpoint);
-    let baseline_processes = helper_process_ids();
     let mut child = Command::new(browser)
         .args([
             "--remote-debugging-address=127.0.0.1".to_string(),
@@ -415,7 +500,7 @@ async fn bootstrap_credential(endpoint: &str) -> Result<CloudCredential, String>
 
     let mut ready = false;
     for _ in 0..40 {
-        hide_process_windows(child.id());
+        hide_helper_process_tree(child.id());
         tokio::time::sleep(Duration::from_millis(250)).await;
         if cdp_available(endpoint).await {
             ready = true;
@@ -431,16 +516,16 @@ async fn bootstrap_credential(endpoint: &str) -> Result<CloudCredential, String>
     }
 
     if !ready {
+        terminate_helper_process_tree(child.id());
         let _ = child.kill();
         tokio::time::sleep(Duration::from_millis(200)).await;
-        terminate_new_helper_processes(&baseline_processes);
         return Err(
             "SAMSUNG_BROWSER_BUSY: Samsung Browser could not start its hidden sync helper. Close Samsung Browser completely, then retry."
                 .into(),
         );
     }
 
-    hide_process_windows(child.id());
+    hide_helper_process_tree(child.id());
 
     let result = acquire_credential(endpoint).await;
     let close_result = close_browser(endpoint).await;
@@ -451,10 +536,11 @@ async fn bootstrap_credential(endpoint: &str) -> Result<CloudCredential, String>
         tokio::time::sleep(Duration::from_millis(150)).await;
     }
     if cdp_available(endpoint).await {
+        terminate_helper_process_tree(child.id());
         let _ = child.kill();
     }
     tokio::time::sleep(Duration::from_millis(200)).await;
-    terminate_new_helper_processes(&baseline_processes);
+    terminate_helper_process_tree(child.id());
 
     match (result, close_result) {
         (Ok(credential), Ok(())) => Ok(credential),
@@ -618,7 +704,11 @@ async fn acquire_credential(endpoint: &str) -> Result<CloudCredential, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_endpoint;
+    use super::{
+        descendant_process_ids, normalize_endpoint, trusted_profile_at, BootstrapFailure,
+        DEFAULT_ENDPOINT,
+    };
+    use std::fs;
 
     #[test]
     fn accepts_and_canonicalizes_loopback_cdp_endpoint() {
@@ -640,5 +730,49 @@ mod tests {
         ] {
             assert!(normalize_endpoint(endpoint).is_err(), "accepted {endpoint}");
         }
+    }
+
+    #[test]
+    fn requires_a_completed_samsung_browser_profile() {
+        let root = std::env::temp_dir().join(format!(
+            "samsung-reminder-profile-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let profile = root.join("Samsung").join("Internet").join("User Data");
+        fs::create_dir_all(profile.join("Default")).expect("create incomplete profile");
+
+        let incomplete = trusted_profile_at(&root).expect_err("incomplete profile was accepted");
+        assert!(incomplete.contains("SAMSUNG_PROFILE_NOT_READY"));
+
+        fs::write(profile.join("Local State"), r#"{"profile":{}}"#).expect("write local state");
+        fs::write(
+            profile.join("Default").join("Preferences"),
+            r#"{"extensions":{}}"#,
+        )
+        .expect("write preferences");
+        assert_eq!(trusted_profile_at(&root).as_deref(), Ok(profile.as_path()));
+
+        fs::remove_dir_all(&root).expect("remove profile fixture");
+    }
+
+    #[test]
+    fn limits_helper_cleanup_to_the_spawned_process_tree() {
+        let processes = [(11, 10), (12, 11), (21, 20), (30, 12)];
+        assert_eq!(
+            descendant_process_ids(10, &processes),
+            [10, 11, 12, 30].into_iter().collect()
+        );
+    }
+
+    #[test]
+    fn shares_a_failed_bootstrap_only_with_already_waiting_requests() {
+        let failure = BootstrapFailure {
+            endpoint: DEFAULT_ENDPOINT.into(),
+            generation: 2,
+            message: "setup required".into(),
+        };
+        assert!(failure.applies_to(DEFAULT_ENDPOINT, 1));
+        assert!(!failure.applies_to(DEFAULT_ENDPOINT, 2));
+        assert!(!failure.applies_to("http://127.0.0.1:9333", 1));
     }
 }

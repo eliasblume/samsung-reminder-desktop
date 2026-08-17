@@ -57,12 +57,15 @@ function categoryUpdateArgs(original: ReminderCategory, modified: ReminderCatego
   return args;
 }
 
-export function createReminderCollections(queryClient: QueryClient, endpoint: string) {
+export function createReminderCollections(queryClient: QueryClient, endpoint: string, enabled = true) {
   const reminders = createCollection(queryCollectionOptions({
     queryKey: ['reminders', endpoint],
     queryFn: () => reminderOperation<ReminderList>('list', { limit: 500 }, endpoint),
     select: (data: ReminderList) => data.reminders,
     queryClient,
+    enabled,
+    retry: false,
+    refetchOnReconnect: false,
     getKey: (reminder: Reminder) => reminder.id,
     onInsert: async ({ transaction }) => {
       for (const mutation of transaction.mutations) {
@@ -86,6 +89,9 @@ export function createReminderCollections(queryClient: QueryClient, endpoint: st
     queryFn: () => reminderOperation<CategoryList>('list_categories', {}, endpoint),
     select: (data: CategoryList) => data.categories,
     queryClient,
+    enabled,
+    retry: false,
+    refetchOnReconnect: false,
     getKey: (category: ReminderCategory) => category.id,
     onInsert: async ({ transaction }) => {
       for (const mutation of transaction.mutations) {

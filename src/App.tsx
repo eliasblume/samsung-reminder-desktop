@@ -1356,13 +1356,18 @@ function ReminderApp() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const collections = useMemo(() => createReminderCollections(queryClient, endpoint), [queryClient, endpoint]);
-  const remindersLive = useLiveQuery(() => collections.reminders, [collections.reminders]);
-  const categoriesLive = useLiveQuery(() => collections.categories, [collections.categories]);
   const probeQuery = useQuery({
     queryKey: ['reminder-status', endpoint],
     queryFn: () => reminderOperation<BridgeProbe>('probe', {}, endpoint),
+    retry: false,
+    refetchOnReconnect: false,
   });
+  const collections = useMemo(
+    () => createReminderCollections(queryClient, endpoint, probeQuery.isSuccess),
+    [queryClient, endpoint, probeQuery.isSuccess],
+  );
+  const remindersLive = useLiveQuery(() => collections.reminders, [collections.reminders]);
+  const categoriesLive = useLiveQuery(() => collections.categories, [collections.categories]);
 
   const reminders = remindersLive.data || [];
   const categories = useMemo(() => {
@@ -1412,10 +1417,12 @@ function ReminderApp() {
   const refresh = async () => {
     setManualSyncing(true);
     try {
+      const wasConnected = probeQuery.isSuccess;
+      const probeResult = await probeQuery.refetch();
+      if (!probeResult.isSuccess || !wasConnected) return;
       await Promise.all([
         collections.reminders.utils.refetch(),
         collections.categories.utils.refetch(),
-        queryClient.invalidateQueries({ queryKey: ['reminder-status', endpoint] }),
       ]);
     } finally {
       setManualSyncing(false);
@@ -1488,10 +1495,16 @@ function ReminderApp() {
   const categoryLabel = category === 'all'
     ? 'My reminders'
     : [...categoryDefinitions, ...customCategoryDefinitions].find((item) => item.id === category)?.label || 'Reminders';
-  const connected = remindersLive.isReady && !collections.reminders.utils.isError;
-  const loading = remindersLive.isLoading || collections.reminders.utils.isLoading;
+  const syncError = probeQuery.error
+    || collections.reminders.utils.lastError
+    || collections.categories.utils.lastError;
+  const connected = probeQuery.isSuccess
+    && remindersLive.isReady
+    && !collections.reminders.utils.isError;
+  const loading = !syncError && (probeQuery.isPending || (probeQuery.isSuccess
+    && (remindersLive.isLoading || collections.reminders.utils.isLoading)));
   const syncing = manualSyncing || loading;
-  const syncIssue = connectionIssue(collections.reminders.utils.lastError || collections.categories.utils.lastError || probeQuery.error);
+  const syncIssue = connectionIssue(syncError);
   const SyncIssueIcon = syncIssue.icon;
 
   return (
