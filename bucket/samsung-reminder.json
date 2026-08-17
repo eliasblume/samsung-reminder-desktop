@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unofficial Samsung Reminder desktop client and local MCP server",
   "homepage": "https://github.com/eliasblume/samsung-reminder-desktop",
   "license": "MIT",
@@ -9,12 +9,12 @@
   ],
   "architecture": {
     "64bit": {
-      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.0/Samsung-Reminder-0.1.0-windows-x64.zip",
-      "hash": "3599032de9651e6d9cfdcc6dc51c9b849e006ccb7c26a65379162a5b7ad193fd"
+      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.1/Samsung-Reminder-0.1.1-windows-x64.zip",
+      "hash": "f6a05b618b71da3515ea6342be662baefe50d669200897927be14053ab8af16a"
     },
     "arm64": {
-      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.0/Samsung-Reminder-0.1.0-windows-arm64.zip",
-      "hash": "df51cfe4bcf369cce8a614316f5d454f00e6ab3d3e4e4a1e673e65a3040417e5"
+      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.1/Samsung-Reminder-0.1.1-windows-arm64.zip",
+      "hash": "42eb2f30cf8c5e591547cda889ce65fe92f0384b061b7393cd2052d70e8f6df8"
     }
   },
   "bin": [
