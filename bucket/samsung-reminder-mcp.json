@@ -1,0 +1,37 @@
+{
+  "version": "0.1.2",
+  "description": "Local MCP server for Samsung Reminder",
+  "homepage": "https://github.com/eliasblume/samsung-reminder-desktop",
+  "license": "MIT",
+  "notes": [
+    "Requires Samsung Browser for Windows installed in its standard location.",
+    "Download Samsung Browser from https://browser.samsung.com/ and sign in before the first sync."
+  ],
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.2/Samsung-Reminder-MCP-0.1.2-windows-x64.zip",
+      "hash": "a0fc4a98eb69bde30e2f07cf1310f59262f0342576de8584bb038223d125df76"
+    },
+    "arm64": {
+      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.2/Samsung-Reminder-MCP-0.1.2-windows-arm64.zip",
+      "hash": "3e437890b8972d402b52455fadf8b5ba7d6937c7824888a223ae02f74e680d92"
+    }
+  },
+  "bin": [
+    [
+      "samsung-reminder-mcp.exe",
+      "samsung-reminder-mcp"
+    ]
+  ],
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v$version/Samsung-Reminder-MCP-$version-windows-x64.zip"
+      },
+      "arm64": {
+        "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v$version/Samsung-Reminder-MCP-$version-windows-arm64.zip"
+      }
+    }
+  }
+}
