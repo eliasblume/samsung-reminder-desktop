@@ -70,6 +70,101 @@ function Copy-SingleBundle {
     Copy-Item -LiteralPath $matches[0].FullName -Destination $Destination
 }
 
+function New-ReleaseArchive {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Files,
+        [Parameter(Mandatory = $true)][string]$Directory
+    )
+
+    $stagingDirectory = Join-Path $Directory $Name
+    New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
+    foreach ($entry in $Files.GetEnumerator()) {
+        Copy-Item -LiteralPath $entry.Value -Destination (Join-Path $stagingDirectory $entry.Key)
+    }
+
+    $archive = Join-Path $Directory "$Name.zip"
+    Compress-Archive -Path (Join-Path $stagingDirectory '*') -DestinationPath $archive -CompressionLevel Optimal
+    Remove-Item -LiteralPath $stagingDirectory -Recurse -Force
+
+    $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    [IO.File]::WriteAllText(
+        "$archive.sha256",
+        "$hash  $([IO.Path]::GetFileName($archive))`n",
+        [Text.UTF8Encoding]::new($false)
+    )
+
+    return [pscustomobject]@{
+        Name = $Name
+        Hash = $hash
+    }
+}
+
+function Write-ScoopFragment {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet('desktop', 'mcp')][string]$Package,
+        [Parameter(Mandatory = $true)][pscustomobject]$Archive,
+        [Parameter(Mandatory = $true)][string]$Directory
+    )
+
+    $scoopArchitecture = if ($Architecture -eq 'x64') { '64bit' } else { 'arm64' }
+    $downloadUrl = "https://github.com/$Repository/releases/download/v$Version/$($Archive.Name).zip"
+    $autoupdateName = $Archive.Name.Replace($Version, '$version')
+    $autoupdateUrl = "https://github.com/$Repository/releases/download/v`$version/$autoupdateName.zip"
+    $notes = @(
+        'Requires Samsung Browser for Windows installed in its standard location.'
+        'Download Samsung Browser from https://browser.samsung.com/ and sign in before the first sync.'
+    )
+    if ($Package -eq 'desktop') {
+        $notes += 'Upgrading from v0.1.1 or older? Update samsung-reminder before installing samsung-reminder-mcp so Scoop removes the old bundled shim first.'
+    }
+
+    $manifest = [ordered]@{
+        version = $Version
+        description = if ($Package -eq 'desktop') {
+            'Unofficial Samsung Reminder desktop client'
+        }
+        else {
+            'Local MCP server for Samsung Reminder'
+        }
+        homepage = "https://github.com/$Repository"
+        license = 'MIT'
+        notes = $notes
+        architecture = [ordered]@{
+            $scoopArchitecture = [ordered]@{
+                url = $downloadUrl
+                hash = $Archive.Hash
+            }
+        }
+    }
+
+    if ($Package -eq 'desktop') {
+        $manifest.shortcuts = @(, @('Reminder.exe', 'Reminder'))
+    }
+    else {
+        $manifest.bin = @(, @('samsung-reminder-mcp.exe', 'samsung-reminder-mcp'))
+    }
+
+    $manifest.checkver = 'github'
+    $manifest.autoupdate = [ordered]@{
+        architecture = [ordered]@{
+            $scoopArchitecture = [ordered]@{
+                url = $autoupdateUrl
+            }
+        }
+    }
+
+    $fragmentName = if ($Package -eq 'desktop') {
+        "samsung-reminder-$Architecture.json"
+    }
+    else {
+        "samsung-reminder-mcp-$Architecture.json"
+    }
+    $manifestPath = Join-Path $Directory $fragmentName
+    $manifestJson = $manifest | ConvertTo-Json -Depth 10
+    [IO.File]::WriteAllText($manifestPath, "$manifestJson`n", [Text.UTF8Encoding]::new($false))
+}
+
 $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd('\')
 $outputPath = [IO.Path]::GetFullPath($OutputDirectory)
 if (-not $outputPath.StartsWith("$rootPath\", [StringComparison]::OrdinalIgnoreCase)) {
@@ -100,65 +195,34 @@ if (Test-Path -LiteralPath $outputPath) {
 }
 New-Item -ItemType Directory -Path $outputPath | Out-Null
 
-$portableName = "Samsung-Reminder-$Version-windows-$Architecture"
-$portableDirectory = Join-Path $outputPath $portableName
-New-Item -ItemType Directory -Path $portableDirectory | Out-Null
-Copy-Item -LiteralPath $appExecutable -Destination (Join-Path $portableDirectory 'Reminder.exe')
-Copy-Item -LiteralPath $mcpExecutable -Destination (Join-Path $portableDirectory 'samsung-reminder-mcp.exe')
-Copy-Item -LiteralPath $licensePath -Destination $portableDirectory
-Copy-Item -LiteralPath $readmePath -Destination $portableDirectory
-Copy-Item -LiteralPath $legalPath -Destination $portableDirectory
-Copy-Item -LiteralPath $noticesPath -Destination $portableDirectory
+$desktopArchive = New-ReleaseArchive `
+    -Name "Samsung-Reminder-$Version-windows-$Architecture" `
+    -Directory $outputPath `
+    -Files ([ordered]@{
+        'Reminder.exe' = $appExecutable
+        'LICENSE' = $licensePath
+        'README.md' = $readmePath
+        'LEGAL.md' = $legalPath
+        'THIRD_PARTY_NOTICES.md' = $noticesPath
+    })
 
-$portableArchive = Join-Path $outputPath "$portableName.zip"
-Compress-Archive -Path (Join-Path $portableDirectory '*') -DestinationPath $portableArchive -CompressionLevel Optimal
-Remove-Item -LiteralPath $portableDirectory -Recurse -Force
-
-$hash = (Get-FileHash -LiteralPath $portableArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-$hashFile = "$portableArchive.sha256"
-[IO.File]::WriteAllText(
-    $hashFile,
-    "$hash  $([IO.Path]::GetFileName($portableArchive))`n",
-    [Text.UTF8Encoding]::new($false)
-)
+$mcpArchive = New-ReleaseArchive `
+    -Name "Samsung-Reminder-MCP-$Version-windows-$Architecture" `
+    -Directory $outputPath `
+    -Files ([ordered]@{
+        'samsung-reminder-mcp.exe' = $mcpExecutable
+        'LICENSE' = $licensePath
+        'README.md' = $readmePath
+        'LEGAL.md' = $legalPath
+        'THIRD_PARTY_NOTICES.md' = $noticesPath
+    })
 
 $nsisDestination = Join-Path $outputPath "Samsung-Reminder-$Version-windows-$Architecture-setup.exe"
 $msiDestination = Join-Path $outputPath "Samsung-Reminder-$Version-windows-$Architecture.msi"
-Copy-SingleBundle -Directory (Join-Path $releaseDirectory 'bundle\nsis') -Filter '*.exe' -Destination $nsisDestination
-Copy-SingleBundle -Directory (Join-Path $releaseDirectory 'bundle\msi') -Filter '*.msi' -Destination $msiDestination
+Copy-SingleBundle -Directory (Join-Path $releaseDirectory 'bundle\nsis') -Filter "*_${Version}_${Architecture}-setup.exe" -Destination $nsisDestination
+Copy-SingleBundle -Directory (Join-Path $releaseDirectory 'bundle\msi') -Filter "*_${Version}_${Architecture}_*.msi" -Destination $msiDestination
 
-$downloadUrl = "https://github.com/$Repository/releases/download/v$Version/$portableName.zip"
-$autoupdateUrl = "https://github.com/$Repository/releases/download/v`$version/Samsung-Reminder-`$version-windows-$Architecture.zip"
-$scoopArchitecture = if ($Architecture -eq 'x64') { '64bit' } else { 'arm64' }
-$manifest = [ordered]@{
-    version = $Version
-    description = 'Unofficial Samsung Reminder desktop client and local MCP server'
-    homepage = "https://github.com/$Repository"
-    license = 'MIT'
-    notes = @(
-        'Requires Samsung Browser for Windows installed in its standard location.'
-        'Download Samsung Browser from https://browser.samsung.com/ and sign in before the first sync.'
-    )
-    architecture = [ordered]@{
-        $scoopArchitecture = [ordered]@{
-            url = $downloadUrl
-            hash = $hash
-        }
-    }
-    bin = @(, @('samsung-reminder-mcp.exe', 'samsung-reminder-mcp'))
-    shortcuts = @(, @('Reminder.exe', 'Reminder'))
-    checkver = 'github'
-    autoupdate = [ordered]@{
-        architecture = [ordered]@{
-            $scoopArchitecture = [ordered]@{
-                url = $autoupdateUrl
-            }
-        }
-    }
-}
-
-$manifestPath = Join-Path $outputPath "samsung-reminder-$Architecture.json"
-$manifestJson = $manifest | ConvertTo-Json -Depth 10
-[IO.File]::WriteAllText($manifestPath, "$manifestJson`n", [Text.UTF8Encoding]::new($false))
+Write-ScoopFragment -Package desktop -Archive $desktopArchive -Directory $outputPath
+Write-ScoopFragment -Package mcp -Archive $mcpArchive -Directory $outputPath
 
 Write-Output "Prepared $Architecture release artifacts for v$Version."

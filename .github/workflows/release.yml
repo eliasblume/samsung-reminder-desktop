@@ -185,6 +185,10 @@ jobs:
             -X64Manifest release/x64/samsung-reminder-x64.json `
             -Arm64Manifest release/arm64/samsung-reminder-arm64.json `
             -OutputPath bucket/samsung-reminder.json
+          ./scripts/merge-scoop-manifests.ps1 `
+            -X64Manifest release/x64/samsung-reminder-mcp-x64.json `
+            -Arm64Manifest release/arm64/samsung-reminder-mcp-arm64.json `
+            -OutputPath bucket/samsung-reminder-mcp.json
 
       - name: Commit and tag the tested release state
         shell: pwsh
@@ -206,7 +210,7 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json bucket/samsung-reminder.json
+          git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json bucket/samsung-reminder.json bucket/samsung-reminder-mcp.json
           git commit -m "chore(release): v$env:VERSION"
           git tag -a $env:TAG -m "Reminder $env:TAG"
 
@@ -221,9 +225,12 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           $assets = @(Get-ChildItem -LiteralPath release -Recurse -File |
-            Where-Object Name -NotMatch '^samsung-reminder-(x64|arm64)\.json$' |
+            Where-Object Name -NotMatch '^samsung-reminder(?:-mcp)?-(x64|arm64)\.json$' |
             ForEach-Object FullName)
-          $assets += (Resolve-Path bucket/samsung-reminder.json).Path
+          $assets += @(
+            (Resolve-Path bucket/samsung-reminder.json).Path
+            (Resolve-Path bucket/samsung-reminder-mcp.json).Path
+          )
           gh release create $env:TAG @assets --draft --verify-tag --title "Reminder $env:TAG" --generate-notes
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
           gh release edit $env:TAG --draft=false --latest
@@ -235,4 +242,4 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           "## Reminder $env:TAG" >> $env:GITHUB_STEP_SUMMARY
-          'Published x64 and ARM64 NSIS, MSI, portable ZIP, SHA-256, MCP, and Scoop artifacts.' >> $env:GITHUB_STEP_SUMMARY
+          'Published x64 and ARM64 NSIS, MSI, desktop and MCP portable ZIPs, SHA-256 files, and separate Scoop packages.' >> $env:GITHUB_STEP_SUMMARY

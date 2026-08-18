@@ -5,6 +5,16 @@ An unofficial Samsung One UI-inspired desktop client and local MCP server for re
 > [!IMPORTANT]
 > This experimental project is not affiliated with, endorsed by, or supported by Samsung. It depends on private Samsung Browser and Samsung Cloud behavior that can change without notice.
 
+## Screenshots
+
+All images show the built-in browser preview with bundled sample data.
+
+![Main window in dark appearance](docs/screenshots/main-dark.png)
+
+| Light appearance | Compact window with details drawer | First-run disclosure |
+| --- | --- | --- |
+| ![Main window in light appearance](docs/screenshots/main-light.png) | ![Details drawer in a compact window](docs/screenshots/details-drawer.png) | ![Cloud access disclosure](docs/screenshots/consent.png) |
+
 ## Requirements
 
 For a prebuilt release:
@@ -36,10 +46,19 @@ scoop bucket add samsung-reminder https://github.com/eliasblume/samsung-reminder
 scoop install samsung-reminder/samsung-reminder
 ```
 
-The release pipeline updates the Scoop version and SHA-256 from every generated portable bundle. Future releases can then be installed with:
+The local MCP server is a separate package, so desktop-only installs do not add a command-line binary to `PATH`:
+
+```powershell
+scoop install samsung-reminder/samsung-reminder-mcp
+```
+
+When upgrading from `v0.1.1` or older, update `samsung-reminder` before installing the MCP package so Scoop removes the previously bundled MCP shim first.
+
+The release pipeline updates both Scoop packages from their separate x64 and ARM64 bundles. Future releases can then be installed with:
 
 ```powershell
 scoop update samsung-reminder
+scoop update samsung-reminder-mcp
 ```
 
 ## Run from source
@@ -67,7 +86,7 @@ Tauri produces NSIS and MSI installers under `src-tauri/target/release/bundle`. 
 
 ## MCP server
 
-Scoop adds `samsung-reminder-mcp` to `PATH`. A local MCP configuration can therefore use:
+Installing the `samsung-reminder-mcp` Scoop package adds `samsung-reminder-mcp` to `PATH`. A local MCP configuration can therefore use:
 
 ```toml
 [mcp_servers.samsung-reminders]
@@ -105,7 +124,7 @@ Reminder and category deletion require `confirmId` to exactly match the target I
 
 The Samsung Cloud credential remains in Rust and is encrypted for the current Windows user by Windows Credential Manager. It is never returned through React or MCP and is not written to logs or plaintext files. The CDP endpoint is restricted to an explicit `http://127.0.0.1:<port>` origin.
 
-Use **Settings → Disconnect Samsung account** to remove the cached credential and return to the first-run disclosure.
+Use **Settings → Disconnect Samsung account** to remove the cached credential and return to the first-run disclosure. **Settings → Erase all app data** additionally clears the stored consent choice and all local settings for a full factory reset. Neither action deletes reminders stored in Samsung Cloud.
 
 The repository contains no Samsung APKs, decompiled Samsung source, Samsung account data, captured API payloads, user screenshots, access tokens, or Samsung artwork. The extension ID, Cloud app ID, endpoint, and table names in source are protocol constants rather than user credentials.
 

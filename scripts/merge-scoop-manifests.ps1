@@ -27,6 +27,13 @@ $arm64 = Read-Manifest -Path $Arm64Manifest
 if ($x64.version -ne $arm64.version) {
     throw "Scoop manifest versions differ: $($x64.version) and $($arm64.version)."
 }
+foreach ($property in @('description', 'homepage', 'license', 'notes')) {
+    $x64Value = $x64.$property | ConvertTo-Json -Compress
+    $arm64Value = $arm64.$property | ConvertTo-Json -Compress
+    if ($x64Value -ne $arm64Value) {
+        throw "Scoop manifest property '$property' differs between architectures."
+    }
+}
 
 $merged = [ordered]@{
     version = $x64.version
@@ -44,17 +51,32 @@ $merged = [ordered]@{
             hash = $arm64.architecture.arm64.hash
         }
     }
-    bin = @(, @('samsung-reminder-mcp.exe', 'samsung-reminder-mcp'))
-    shortcuts = @(, @('Reminder.exe', 'Reminder'))
-    checkver = 'github'
-    autoupdate = [ordered]@{
-        architecture = [ordered]@{
-            '64bit' = [ordered]@{
-                url = $x64.autoupdate.architecture.'64bit'.url
-            }
-            arm64 = [ordered]@{
-                url = $arm64.autoupdate.architecture.arm64.url
-            }
+}
+
+foreach ($property in @('bin', 'shortcuts')) {
+    $x64Property = $x64.PSObject.Properties[$property]
+    $arm64Property = $arm64.PSObject.Properties[$property]
+    if (($null -eq $x64Property) -ne ($null -eq $arm64Property)) {
+        throw "Scoop manifest property '$property' is missing from one architecture."
+    }
+    if ($null -ne $x64Property) {
+        $x64Value = $x64Property.Value | ConvertTo-Json -Compress
+        $arm64Value = $arm64Property.Value | ConvertTo-Json -Compress
+        if ($x64Value -ne $arm64Value) {
+            throw "Scoop manifest property '$property' differs between architectures."
+        }
+        $merged[$property] = $x64Property.Value
+    }
+}
+
+$merged.checkver = 'github'
+$merged.autoupdate = [ordered]@{
+    architecture = [ordered]@{
+        '64bit' = [ordered]@{
+            url = $x64.autoupdate.architecture.'64bit'.url
+        }
+        arm64 = [ordered]@{
+            url = $arm64.autoupdate.architecture.arm64.url
         }
     }
 }

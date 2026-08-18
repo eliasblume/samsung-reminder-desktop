@@ -16,10 +16,10 @@ This checklist records the source and release controls used for the initial publ
 
 ## Release checks
 
-- [x] The workflow builds x64 and ARM64 NSIS, MSI, portable, MCP, checksum, and Scoop artifacts from the same tested version.
+- [x] The workflow builds x64 and ARM64 NSIS, MSI, separate desktop/MCP portable ZIPs, checksums, and Scoop artifacts from the same tested version.
 - [x] A read-only build job is separated from the write-capable publish job.
 - [x] The publish job refuses to release if `main` changed during the build.
-- [x] The Scoop manifest is generated from the final portable ZIP hash.
+- [x] The desktop and MCP Scoop manifests are generated from their final portable ZIP hashes.
 - [ ] Add Authenticode signing when a protected signing identity is available. Until then, releases must state that Windows may show an unknown-publisher warning.
 - [ ] Smoke-test portable install, update, and uninstall on clean Windows x64 and ARM64 machines for each release.
 

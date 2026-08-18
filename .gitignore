@@ -25,6 +25,7 @@
 # Editors and operating systems
 /.idea/
 /.vscode/
+/.claude/
 .DS_Store
 Thumbs.db
 Desktop.ini

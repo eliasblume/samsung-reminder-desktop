@@ -72,6 +72,7 @@ type SettingsDialogProps = {
   setTheme: (value: Theme) => void;
   connected: boolean;
   onDisconnect: () => Promise<void>;
+  onWipe: () => Promise<void>;
 };
 
 const consentStorageKey = 'samsung-reminder-cloud-consent-v1';
@@ -573,12 +574,14 @@ function ReminderRow({ reminder, selected, onSelect, onToggle }: {
   );
 }
 
-function Inspector({ reminder, categories, onSave, onDelete, saving }: {
+function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClose }: {
   reminder: Reminder | null;
   categories: ReminderCategory[];
   onSave: (values: Record<string, unknown>) => void;
   onDelete: (id: string) => void;
   saving: boolean;
+  open: boolean;
+  onClose: () => void;
 }) {
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -743,17 +746,22 @@ function Inspector({ reminder, categories, onSave, onDelete, saving }: {
   }
 
   return (
-    <aside className="inspector hidden lg:flex">
+    <aside className={`inspector hidden lg:flex ${open ? 'is-drawer' : ''}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-[0.11em] text-muted">Details</span>
-        <button
-          type="button"
-          className={`favorite-button ${favorite ? 'is-active' : ''}`}
-          onClick={() => setFavorite((value) => !value)}
-          aria-label={favorite ? 'Remove from important' : 'Mark important'}
-        >
-          <Star size={19} fill={favorite ? 'currentColor' : 'none'} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className={`favorite-button ${favorite ? 'is-active' : ''}`}
+            onClick={() => setFavorite((value) => !value)}
+            aria-label={favorite ? 'Remove from important' : 'Mark important'}
+          >
+            <Star size={19} fill={favorite ? 'currentColor' : 'none'} />
+          </button>
+          <button type="button" className="icon-button drawer-close" aria-label="Close details" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="mt-8 flex min-h-0 flex-1 flex-col overflow-y-auto pr-2">
@@ -1243,10 +1251,12 @@ function CategoryManager({ trigger, categories, counts, busy, onCreate, onUpdate
   );
 }
 
-function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onDisconnect }: SettingsDialogProps) {
+function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onDisconnect, onWipe }: SettingsDialogProps) {
   const [draftEndpoint, setDraftEndpoint] = useState(endpoint);
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
+  const [wiping, setWiping] = useState(false);
+  const [wipeError, setWipeError] = useState<string | null>(null);
   const mcpConfig = `[mcp_servers.samsung-reminders]\ncommand = "C:/path/to/samsung-reminder-mcp.exe"\nenv = { CDP_ENDPOINT = "${endpoint}" }`;
 
   return (
@@ -1322,6 +1332,51 @@ function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onD
             </div>
             <button className="text-button mt-3" type="button" onClick={() => navigator.clipboard.writeText(mcpConfig)}>Copy configuration</button>
           </section>
+
+          <Separator.Root className="h-px bg-line" />
+          <section>
+            <p className="settings-label">Erase all app data</p>
+            <p className="mt-1 text-xs leading-5 text-muted">Remove everything this app stores on this PC and start over from the connection disclosure. Reminders and lists in Samsung Cloud are not deleted.</p>
+            {wipeError ? <p className="mt-2 text-xs text-danger" role="alert">{wipeError}</p> : null}
+            <AlertDialog.Root>
+              <AlertDialog.Trigger asChild>
+                <button className="wipe-button mt-3" type="button" disabled={wiping}>
+                  <Trash2 size={15} /> {wiping ? 'Erasing…' : 'Erase app data'}
+                </button>
+              </AlertDialog.Trigger>
+              <AlertDialog.Portal>
+                <AlertDialog.Overlay className="dialog-overlay" />
+                <AlertDialog.Content className="dialog-content max-w-[440px]">
+                  <AlertDialog.Title className="dialog-title">Erase all app data?</AlertDialog.Title>
+                  <AlertDialog.Description className="dialog-description">This resets the app to how it was after installation and removes:</AlertDialog.Description>
+                  <ul className="mt-4 list-disc space-y-1.5 pl-5 text-[13px] leading-5 text-muted marker:text-muted/60">
+                    <li>The cached Samsung Cloud credential in Windows Credential Manager</li>
+                    <li>Your consent choice for cloud access</li>
+                    <li>Local settings, including the bridge endpoint and appearance</li>
+                  </ul>
+                  <p className="mt-4 text-[13px] leading-5 text-muted">Your reminders stay safe in Samsung Cloud. The app restarts at the connection disclosure.</p>
+                  <div className="mt-7 flex justify-end gap-3">
+                    <AlertDialog.Cancel asChild><button className="secondary-button">Cancel</button></AlertDialog.Cancel>
+                    <AlertDialog.Action asChild>
+                      <button
+                        className="delete-button"
+                        onClick={() => {
+                          setWiping(true);
+                          setWipeError(null);
+                          void onWipe().catch((error) => {
+                            setWipeError(errorMessage(error));
+                            setWiping(false);
+                          });
+                        }}
+                      >
+                        Erase and restart
+                      </button>
+                    </AlertDialog.Action>
+                  </div>
+                </AlertDialog.Content>
+              </AlertDialog.Portal>
+            </AlertDialog.Root>
+          </section>
         </div>
       </Dialog.Content>
     </Dialog.Portal>
@@ -1333,6 +1388,7 @@ function ReminderApp() {
   const [category, setCategory] = useState<CategoryId>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [quickTitle, setQuickTitle] = useState('');
   const [endpoint, setEndpoint] = useState(() => localStorage.getItem('reminder-cdp-endpoint') || 'http://127.0.0.1:9226');
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('reminder-theme') as Theme) || 'dark');
@@ -1411,7 +1467,10 @@ function ReminderApp() {
     if (filtered.length && !filtered.some((item) => item.id === selectedId)) {
       setSelectedId(filtered[0].id);
     }
-    if (!filtered.length && selectedId) setSelectedId(null);
+    if (!filtered.length && selectedId) {
+      setSelectedId(null);
+      setDetailsOpen(false);
+    }
   }, [filtered, selectedId]);
 
   const refresh = async () => {
@@ -1471,12 +1530,19 @@ function ReminderApp() {
   function deleteReminder(id: string) {
     const transaction = collections.reminders.delete(id);
     setSelectedId(null);
+    setDetailsOpen(false);
     observeTransaction(transaction, 'Reminder deleted');
   }
 
   async function disconnectAccount() {
     await clearReminderCredential();
     localStorage.removeItem(consentStorageKey);
+    window.location.reload();
+  }
+
+  async function wipeAppData() {
+    await clearReminderCredential();
+    localStorage.clear();
     window.location.reload();
   }
 
@@ -1580,6 +1646,7 @@ function ReminderApp() {
                     setTheme={setTheme}
                     connected={connected}
                     onDisconnect={disconnectAccount}
+                    onWipe={wipeAppData}
                   />
                 </Dialog.Root>
               </DropdownMenu.Content>
@@ -1663,7 +1730,7 @@ function ReminderApp() {
                                 key={reminder.id}
                                 reminder={reminder}
                                 selected={reminder.id === selectedId}
-                                onSelect={() => setSelectedId(reminder.id)}
+                                onSelect={() => { setSelectedId(reminder.id); setDetailsOpen(true); }}
                                 onToggle={() => updateReminder({ id: reminder.id, completed: !reminder.completed }, reminder.completed ? 'Reminder reopened' : 'Reminder completed')}
                               />
                             ))}
@@ -1697,10 +1764,20 @@ function ReminderApp() {
           </div>
         </main>
 
+        {detailsOpen && selected ? (
+          <button
+            type="button"
+            className="drawer-scrim lg:hidden"
+            aria-label="Close details"
+            onClick={() => setDetailsOpen(false)}
+          />
+        ) : null}
         <Inspector
           reminder={selected}
           categories={categories}
           saving={pendingWrites > 0}
+          open={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
           onSave={(values) => updateReminder(values)}
           onDelete={deleteReminder}
         />
@@ -1775,7 +1852,6 @@ function ConsentGate({ state, onContinue, onCancel, onReview }: {
             <span className="consent-brand-mark"><Check size={20} strokeWidth={3.2} /></span>
             <span>Reminder</span>
           </div>
-          <span className="consent-local-badge"><LockKeyhole size={13} /> Local connection</span>
         </header>
 
         <section className="consent-panel" aria-labelledby="consent-title" aria-describedby="consent-summary">
