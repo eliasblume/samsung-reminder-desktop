@@ -1,5 +1,5 @@
 {
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local MCP server for Samsung Reminder",
   "homepage": "https://github.com/eliasblume/samsung-reminder-desktop",
   "license": "MIT",
@@ -9,12 +9,12 @@
   ],
   "architecture": {
     "64bit": {
-      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.2/Samsung-Reminder-MCP-0.1.2-windows-x64.zip",
-      "hash": "a0fc4a98eb69bde30e2f07cf1310f59262f0342576de8584bb038223d125df76"
+      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.3/Samsung-Reminder-MCP-0.1.3-windows-x64.zip",
+      "hash": "657c6daea88e42a2099dc8a29cd79e7cc2f0ab75cb4cb054002ad9ea6c55c7be"
     },
     "arm64": {
-      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.2/Samsung-Reminder-MCP-0.1.2-windows-arm64.zip",
-      "hash": "3e437890b8972d402b52455fadf8b5ba7d6937c7824888a223ae02f74e680d92"
+      "url": "https://github.com/eliasblume/samsung-reminder-desktop/releases/download/v0.1.3/Samsung-Reminder-MCP-0.1.3-windows-arm64.zip",
+      "hash": "a3607aece609224f7cc6352822835768573e3e158d9aac568dc9a7e141ab4e96"
     }
   },
   "bin": [
