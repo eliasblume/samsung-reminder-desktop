@@ -2,7 +2,9 @@
 
 pub mod bridge;
 mod cloud;
+pub mod operations;
 
+use operations::ReminderOperation;
 use serde_json::{json, Value};
 
 #[tauri::command]
@@ -26,21 +28,11 @@ async fn clear_reminder_credential() -> Result<(), String> {
 
 #[tauri::command]
 fn mcp_info() -> Value {
+    let tools = ReminderOperation::ALL.map(ReminderOperation::tool_name);
     json!({
         "binary": "samsung-reminder-mcp.exe",
         "transport": "stdio",
-        "tools": [
-            "samsung_reminders_status",
-            "samsung_reminders_list",
-            "samsung_reminder_categories_list",
-            "samsung_reminder_category_create",
-            "samsung_reminder_category_update",
-            "samsung_reminder_category_delete",
-            "samsung_reminders_get",
-            "samsung_reminders_create",
-            "samsung_reminders_update",
-            "samsung_reminders_delete"
-        ]
+        "tools": tools
     })
 }
 

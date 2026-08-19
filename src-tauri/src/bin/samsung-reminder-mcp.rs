@@ -1,4 +1,5 @@
 use samsung_reminder_desktop_lib::bridge;
+use samsung_reminder_desktop_lib::operations::ReminderOperation;
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
@@ -34,22 +35,6 @@ fn tools() -> Value {
     tools
 }
 
-fn operation_for_tool(name: &str) -> Option<&'static str> {
-    match name {
-        "samsung_reminders_status" => Some("probe"),
-        "samsung_reminders_list" => Some("list"),
-        "samsung_reminder_categories_list" => Some("list_categories"),
-        "samsung_reminder_category_create" => Some("create_category"),
-        "samsung_reminder_category_update" => Some("update_category"),
-        "samsung_reminder_category_delete" => Some("delete_category"),
-        "samsung_reminders_get" => Some("get"),
-        "samsung_reminders_create" => Some("create"),
-        "samsung_reminders_update" => Some("update"),
-        "samsung_reminders_delete" => Some("delete"),
-        _ => None,
-    }
-}
-
 fn redact_status_identity(result: &mut Value) {
     let Some(status) = result.as_object_mut() else {
         return;
@@ -77,7 +62,7 @@ async fn handle(message: &Value) -> Option<Value> {
                 .pointer("/params/name")
                 .and_then(Value::as_str)
                 .unwrap_or("");
-            let Some(operation) = operation_for_tool(name) else {
+            let Some(operation) = ReminderOperation::from_tool_name(name) else {
                 return Some(
                     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32602, "message": format!("Unknown tool: {name}") } }),
                 );
@@ -88,7 +73,7 @@ async fn handle(message: &Value) -> Option<Value> {
                 .unwrap_or_else(|| json!({}));
             let endpoint =
                 std::env::var("CDP_ENDPOINT").unwrap_or_else(|_| bridge::DEFAULT_ENDPOINT.into());
-            match bridge::run_managed_operation(operation, args, &endpoint).await {
+            match bridge::run_managed_operation(operation.api_name(), args, &endpoint).await {
                 Ok(mut result) => {
                     if name == "samsung_reminders_status" {
                         redact_status_identity(&mut result);
@@ -137,8 +122,28 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::redact_status_identity;
+    use super::{redact_status_identity, tools, ReminderOperation};
     use serde_json::json;
+
+    #[test]
+    fn advertised_tools_match_the_shared_operation_registry() {
+        let advertised = tools();
+        let names = advertised
+            .as_array()
+            .expect("tool registry should be an array")
+            .iter()
+            .map(|tool| {
+                tool.get("name")
+                    .and_then(serde_json::Value::as_str)
+                    .expect("every tool should have a name")
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(names.len(), ReminderOperation::ALL.len());
+        for operation in ReminderOperation::ALL {
+            assert!(names.contains(&operation.tool_name()));
+        }
+    }
 
     #[test]
     fn removes_account_identity_from_mcp_status() {

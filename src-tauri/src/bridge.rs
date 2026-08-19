@@ -1,4 +1,5 @@
 use crate::cloud::{self, CloudCredential, CloudError};
+use crate::operations::ReminderOperation;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -366,21 +367,8 @@ pub async fn run_managed_operation(
     args: Value,
     endpoint: &str,
 ) -> Result<Value, String> {
-    if !matches!(
-        operation,
-        "probe"
-            | "list"
-            | "list_categories"
-            | "create_category"
-            | "update_category"
-            | "delete_category"
-            | "get"
-            | "create"
-            | "update"
-            | "delete"
-    ) {
-        return Err(format!("Unsupported Reminder operation: {operation}"));
-    }
+    let operation = ReminderOperation::from_api_name(operation)
+        .ok_or_else(|| format!("Unsupported Reminder operation: {operation}"))?;
     let endpoint = normalize_endpoint(endpoint)?;
     let observed_bootstrap_generation = BOOTSTRAP_FAILURE_GENERATION.load(Ordering::Acquire);
     let _guard = MANAGED_BROWSER_LOCK.lock().await;
@@ -403,7 +391,7 @@ pub async fn run_managed_operation(
         }
     };
 
-    if operation == "probe" && credential.needs_identity_refresh() {
+    if operation == ReminderOperation::Probe && credential.needs_identity_refresh() {
         if let Ok(refreshed) = bootstrap_credential(&endpoint).await {
             store_persistent_credential(&refreshed)?;
             *CREDENTIAL_CACHE.write().await = Some(refreshed.clone());
