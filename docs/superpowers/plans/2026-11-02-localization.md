@@ -63,16 +63,16 @@ Files: `src/lib/reminder-collections.ts`, `src/App.tsx`, regression tests.
 - [x] Reproduce the reported rows-to-zero transition in a synthetic isolated page,
   recording collection identity, subscribers, rows, cache events, and query result.
 - [x] Add a failing regression for the observed transition and fix its owning layer.
-- [ ] Verify transient failure retains successfully loaded rows and reports failure.
+- [x] Verify transient failure retains successfully loaded rows and reports failure.
 - [x] Verify cleanup cannot delete another live collection's query.
 
 ## 4. Delivery
 
-- [ ] Review all changes and document adding a language in README.
-- [ ] Run frontend tests/types/build and Rust checks affected by the final diff.
-- [ ] Commit, verify `gh auth status` is active `korsun009`, push, and update PR 53.
-- [ ] Build the final native installer using the authorized temporary SSD target.
-- [ ] Install and verify installer-payload hash, manual sync, restart, both languages,
+- [x] Review all changes and document adding a language in README.
+- [x] Run frontend tests/types/build and Rust checks affected by the final diff.
+- [x] Commit, verify `gh auth status` is active `korsun009`, push, and update PR 53.
+- [x] Build the final native installer using the authorized temporary SSD target.
+- [x] Install and verify installer-payload hash, manual sync, restart, both languages,
   saved preference, and stable counters past the cleanup interval.
-- [ ] Copy final artifacts/provenance to outputs, then safely remove the authorized
+- [x] Copy final artifacts/provenance to outputs, then safely remove the authorized
   temporary SSD directory after resolving and checking its exact absolute path.
