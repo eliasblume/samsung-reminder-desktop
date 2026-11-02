@@ -84,6 +84,7 @@ export type ReminderList = {
   count: number;
   reminders: Reminder[];
   hasMore: boolean;
+  nextOffset: string | number | null;
 };
 
 export type BridgeProbe = {
@@ -165,7 +166,7 @@ async function previewOperation<T>(operation: Operation, args: Record<string, un
     } as T;
   }
   if (operation === 'list') {
-    return { count: previewReminders.length, reminders: previewReminders, hasMore: false } as T;
+    return { count: previewReminders.length, reminders: previewReminders, hasMore: false, nextOffset: null } as T;
   }
   if (operation === 'list_categories') {
     return { count: previewCategories.length, categories: previewCategories } as T;

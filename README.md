@@ -109,6 +109,8 @@ The stdio server exposes:
 - `samsung_reminders_update`
 - `samsung_reminders_delete`
 
+`samsung_reminders_list` returns one page (up to `limit` items) with `hasMore` and `nextOffset`. Pass `nextOffset` as `offset` to read the next page. The desktop app loads all pages automatically, including completed reminders; category operations also traverse the full collection.
+
 Reminder and category deletion require `confirmId` to exactly match the target ID. Deleting a category first moves its reminders to My reminders. MCP status deliberately omits the Samsung account email and account-ID hint that the local desktop UI can display.
 
 ## Architecture
@@ -135,6 +137,8 @@ See [SECURITY.md](SECURITY.md) before reporting a vulnerability. Never attach to
 ## Scope and caveats
 
 A Samsung Browser, signed extension, or Cloud API update can break this project. The current proof of concept covers listing, reading, creating, editing, completing, favoriting, custom lists, checklists, recurrence, place/time alarms, early alerts, all-day reminders, alert strength, sharing, and guarded deletion.
+
+Alert schedules are edited and synchronized with Samsung Cloud; native Windows reminder notifications are not currently implemented.
 
 Attachment upload, voice capture, map search/geocoding, and Samsung's suggested-reminder templates are not implemented. Windows installers are initially unsigned, so Windows may display a publisher warning. Checksums verify downloaded bytes but do not establish publisher identity.
 

@@ -18,7 +18,9 @@ fn public_category(record: &Value) -> Value {
 }
 
 pub(super) async fn list(cloud: &CloudClient, _args: &Value) -> Result<Value, CloudError> {
-    let (_, ids, _) = cloud.list_table_record_ids(CATEGORY_TABLE, 100).await?;
+    let (_, ids, _) = cloud
+        .list_all_table_record_ids(CATEGORY_TABLE, 100, None)
+        .await?;
     let records = cloud.get_table_records(CATEGORY_TABLE, &ids).await?;
     let categories = records.iter().map(public_category).collect::<Vec<_>>();
     Ok(json!({ "count": categories.len(), "categories": categories }))
@@ -131,7 +133,9 @@ pub(super) async fn delete(cloud: &CloudClient, args: &Value) -> Result<Value, C
     if cloud.get_table_record(CATEGORY_TABLE, id).await?.is_none() {
         return Err(CloudError::Message("Category not found".into()));
     }
-    let (_, reminder_ids, _) = cloud.list_table_record_ids(REMINDER_TABLE, 500).await?;
+    let (_, reminder_ids, _) = cloud
+        .list_all_table_record_ids(REMINDER_TABLE, 500, None)
+        .await?;
     let mut moved = 0;
     for mut reminder in cloud
         .get_table_records(REMINDER_TABLE, &reminder_ids)

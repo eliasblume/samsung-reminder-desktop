@@ -102,12 +102,22 @@ pub(super) fn new_record(title: &str, text: &str) -> Value {
 
 pub(super) async fn list(cloud: &CloudClient, args: &Value) -> Result<Value, CloudError> {
     let limit = args.get("limit").and_then(Value::as_u64).unwrap_or(100);
-    let (_, ids, meta) = cloud.list_table_record_ids(REMINDER_TABLE, limit).await?;
+    let offset = super::client::pagination_offset(args.get("offset"))?;
+    let (_, ids, meta) = if args.get("all").and_then(Value::as_bool).unwrap_or(false) {
+        cloud
+            .list_all_table_record_ids(REMINDER_TABLE, limit, offset)
+            .await?
+    } else {
+        cloud
+            .list_table_record_ids_at_offset(REMINDER_TABLE, limit, offset.as_deref())
+            .await?
+    };
     let records = cloud.get_table_records(REMINDER_TABLE, &ids).await?;
     Ok(json!({
         "count": records.len(),
         "reminders": records.iter().map(public_record).collect::<Vec<_>>(),
-        "hasMore": meta.get("next_offset").is_some_and(|value| !value.is_null())
+        "hasMore": super::client::pagination_offset(meta.get("next_offset"))?.is_some(),
+        "nextOffset": meta.get("next_offset").cloned().unwrap_or(Value::Null)
     }))
 }
 

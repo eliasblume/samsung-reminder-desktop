@@ -6,7 +6,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 fn tools() -> Value {
     let mut tools = json!([
         { "name": "samsung_reminders_status", "description": "Check the Samsung Browser credential bridge and Reminder table.", "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} } },
-        { "name": "samsung_reminders_list", "description": "List Samsung Reminder items.", "inputSchema": { "type": "object", "additionalProperties": false, "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 } } } },
+        { "name": "samsung_reminders_list", "description": "List one page of Samsung Reminder items. Pass nextOffset from the response as offset to continue.", "inputSchema": { "type": "object", "additionalProperties": false, "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 100 }, "offset": { "type": ["string", "integer"], "minLength": 1, "minimum": 0, "description": "The nextOffset returned by the previous page." } } } },
         { "name": "samsung_reminder_categories_list", "description": "List Samsung Reminder custom categories.", "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} } },
         { "name": "samsung_reminder_category_create", "description": "Create a Samsung Reminder list/category with a synced color and icon.", "inputSchema": { "type": "object", "additionalProperties": false, "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "color": { "type": "integer", "minimum": 0, "maximum": 7, "default": 0 }, "iconIndex": { "type": "integer", "minimum": 0, "maximum": 41, "default": 1 }, "order": { "type": "integer", "minimum": 0, "default": 0 } } } },
         { "name": "samsung_reminder_category_update", "description": "Rename, recolor, or change the synced icon of a Samsung Reminder list/category.", "inputSchema": { "type": "object", "additionalProperties": false, "required": ["id"], "properties": { "id": { "type": "string", "minLength": 1 }, "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "color": { "type": "integer", "minimum": 0, "maximum": 7 }, "iconIndex": { "type": "integer", "minimum": 0, "maximum": 41 }, "order": { "type": "integer", "minimum": 0 } } } },
@@ -43,6 +43,17 @@ fn redact_status_identity(result: &mut Value) {
     status.remove("accountIdHint");
 }
 
+fn mcp_arguments(operation: ReminderOperation, mut args: Value) -> Value {
+    // Full collection loading is reserved for the desktop UI. MCP lists stay paged
+    // even when a client bypasses the advertised additionalProperties constraint.
+    if operation == ReminderOperation::List {
+        if let Some(object) = args.as_object_mut() {
+            object.remove("all");
+        }
+    }
+    args
+}
+
 async fn handle(message: &Value) -> Option<Value> {
     let method = message.get("method")?.as_str()?;
     let id = message.get("id").cloned().unwrap_or(Value::Null);
@@ -71,6 +82,7 @@ async fn handle(message: &Value) -> Option<Value> {
                 .pointer("/params/arguments")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
+            let args = mcp_arguments(operation, args);
             let endpoint =
                 std::env::var("CDP_ENDPOINT").unwrap_or_else(|_| bridge::DEFAULT_ENDPOINT.into());
             match bridge::run_managed_operation(operation.api_name(), args, &endpoint).await {
@@ -124,6 +136,15 @@ async fn main() {
 mod tests {
     use super::{redact_status_identity, tools, ReminderOperation};
     use serde_json::json;
+
+    #[test]
+    fn mcp_list_cannot_enable_desktop_full_sync() {
+        let args = super::mcp_arguments(
+            ReminderOperation::List,
+            json!({"limit": 1, "offset": "next", "all": true}),
+        );
+        assert_eq!(args, json!({"limit": 1, "offset": "next"}));
+    }
 
     #[test]
     fn advertised_tools_match_the_shared_operation_registry() {

@@ -60,7 +60,7 @@ function categoryUpdateArgs(original: ReminderCategory, modified: ReminderCatego
 export function createReminderCollections(queryClient: QueryClient, endpoint: string, enabled = true) {
   const reminders = createCollection(queryCollectionOptions({
     queryKey: ['reminders', endpoint],
-    queryFn: () => reminderOperation<ReminderList>('list', { limit: 500 }, endpoint),
+    queryFn: () => reminderOperation<ReminderList>('list', { limit: 500, all: true }, endpoint),
     select: (data: ReminderList) => data.reminders,
     queryClient,
     enabled,

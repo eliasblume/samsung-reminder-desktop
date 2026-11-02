@@ -1,5 +1,6 @@
 use reqwest::{Client, Method, StatusCode};
 use serde_json::{json, Value};
+use std::collections::HashSet;
 
 use super::{now_millis, CloudCredential, CloudError};
 
@@ -11,6 +12,8 @@ pub(super) const CATEGORY_TABLE: &str = "com.samsung.android.app.reminder.catego
 pub(super) struct CloudClient {
     client: Client,
     credential: CloudCredential,
+    #[cfg(test)]
+    base_url: String,
 }
 
 impl CloudClient {
@@ -19,7 +22,12 @@ impl CloudClient {
             .timeout(std::time::Duration::from_secs(20))
             .build()
             .map_err(|error| CloudError::Message(error.to_string()))?;
-        Ok(Self { client, credential })
+        Ok(Self {
+            client,
+            credential,
+            #[cfg(test)]
+            base_url: BASE_URL.into(),
+        })
     }
 
     pub(super) fn credential(&self) -> &CloudCredential {
@@ -32,9 +40,13 @@ impl CloudClient {
         path: &str,
         body: Option<Value>,
     ) -> Result<(u16, Value), CloudError> {
+        #[cfg(test)]
+        let base_url = &self.base_url;
+        #[cfg(not(test))]
+        let base_url = BASE_URL;
         let mut request = self
             .client
-            .request(method, format!("{BASE_URL}{path}"))
+            .request(method, format!("{base_url}{path}"))
             .header("x-sc-uid", &self.credential.user_id)
             .header("x-sc-access-token", &self.credential.access_token)
             .header("x-sc-app-id", APP_ID)
@@ -73,10 +85,24 @@ impl CloudClient {
         table: &str,
         limit: u64,
     ) -> Result<(u16, Vec<String>, Value), CloudError> {
+        self.list_table_record_ids_at_offset(table, limit, None)
+            .await
+    }
+
+    pub(super) async fn list_table_record_ids_at_offset(
+        &self,
+        table: &str,
+        limit: u64,
+        offset: Option<&str>,
+    ) -> Result<(u16, Vec<String>, Value), CloudError> {
         let limit = limit.clamp(1, 500);
-        let path = format!(
+        let mut path = format!(
             "/data/v2/{table}?table_ver=1&select=record_id%2Cmod_timestamp&limit={limit}&meta=true&include_deleted_items=false"
         );
+        if let Some(offset) = offset {
+            path.push_str("&offset=");
+            path.push_str(&urlencoding::encode(offset));
+        }
         let (status, body) = self.request(Method::GET, &path, None).await?;
         let ids = body
             .get("records")
@@ -91,6 +117,38 @@ impl CloudClient {
             ids,
             body.get("meta").cloned().unwrap_or_else(|| json!({})),
         ))
+    }
+
+    pub(super) async fn list_all_table_record_ids(
+        &self,
+        table: &str,
+        page_size: u64,
+        mut offset: Option<String>,
+    ) -> Result<(u16, Vec<String>, Value), CloudError> {
+        let mut ids = Vec::new();
+        let mut seen_ids = HashSet::new();
+        let mut seen_offsets = HashSet::new();
+        loop {
+            if let Some(current) = &offset {
+                if !seen_offsets.insert(current.clone()) {
+                    return Err(CloudError::Message(
+                        "Samsung Cloud returned a repeated pagination offset.".into(),
+                    ));
+                }
+            }
+            let (status, page_ids, meta) = self
+                .list_table_record_ids_at_offset(table, page_size, offset.as_deref())
+                .await?;
+            for id in page_ids {
+                if seen_ids.insert(id.clone()) {
+                    ids.push(id);
+                }
+            }
+            offset = pagination_offset(meta.get("next_offset"))?;
+            if offset.is_none() {
+                return Ok((status, ids, meta));
+            }
+        }
     }
 
     pub(super) async fn list_record_ids(
@@ -170,6 +228,18 @@ impl CloudClient {
     }
 }
 
+pub(super) fn pagination_offset(value: Option<&Value>) -> Result<Option<String>, CloudError> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(value)) if value.is_empty() => Ok(None),
+        Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(Value::Number(value)) if value.as_u64().is_some() => Ok(Some(value.to_string())),
+        _ => Err(CloudError::Message(
+            "Invalid Samsung Cloud pagination offset.".into(),
+        )),
+    }
+}
+
 fn reject_failed_records(body: &Value, noun: &str) -> Result<(), CloudError> {
     let Some(failed) = body.get("failed_records").and_then(Value::as_array) else {
         return Ok(());
@@ -185,3 +255,7 @@ fn reject_failed_records(body: &Value, noun: &str) -> Result<(), CloudError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "pagination_tests.rs"]
+mod pagination_tests;
