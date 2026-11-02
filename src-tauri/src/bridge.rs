@@ -443,6 +443,39 @@ async fn bootstrap_credential_for_request(
     }
 }
 
+fn browser_helper_args(endpoint: &str, profile: &Path) -> Vec<String> {
+    let port = endpoint_port(endpoint);
+    vec![
+        "--remote-debugging-address=127.0.0.1".into(),
+        format!("--remote-debugging-port={port}"),
+        format!("--remote-allow-origins={endpoint}"),
+        format!("--user-data-dir={}", profile.display()),
+        "--no-startup-window".into(),
+        "--disable-session-crashed-bubble".into(),
+        "--no-first-run".into(),
+        "--no-default-browser-check".into(),
+    ]
+}
+
+struct HelperWindowHider(tokio::task::JoinHandle<()>);
+
+impl HelperWindowHider {
+    fn new(root_pid: u32) -> Self {
+        Self(tokio::spawn(async move {
+            loop {
+                hide_helper_process_tree(root_pid);
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }))
+    }
+}
+
+impl Drop for HelperWindowHider {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 async fn bootstrap_credential(endpoint: &str) -> Result<CloudCredential, String> {
     if cdp_available(endpoint).await {
         let credential = acquire_credential(endpoint).await?;
@@ -466,25 +499,16 @@ async fn bootstrap_credential(endpoint: &str) -> Result<CloudCredential, String>
         );
     }
     let profile = trusted_profile()?;
-    let port = endpoint_port(endpoint);
     let mut child = Command::new(browser)
-        .args([
-            "--remote-debugging-address=127.0.0.1".to_string(),
-            format!("--remote-debugging-port={port}"),
-            format!("--remote-allow-origins={endpoint}"),
-            format!("--user-data-dir={}", profile.display()),
-            "--window-position=-32000,-32000".to_string(),
-            "--window-size=1,1".to_string(),
-            "--disable-session-crashed-bubble".to_string(),
-            "--no-first-run".to_string(),
-            "--no-default-browser-check".to_string(),
-            "about:blank".to_string(),
-        ])
+        .args(browser_helper_args(endpoint, &profile))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("Could not start the hidden Samsung Browser helper: {error}"))?;
+    // A Calendar target can create a window after the CDP endpoint becomes ready.
+    // Hide owned windows throughout bootstrap without persisting off-screen geometry.
+    let _window_hider = HelperWindowHider::new(child.id());
 
     let mut ready = false;
     for _ in 0..40 {
@@ -697,6 +721,19 @@ mod tests {
         DEFAULT_ENDPOINT,
     };
     use std::fs;
+
+    #[test]
+    fn hidden_helper_does_not_overwrite_browser_window_placement() {
+        let args = super::browser_helper_args(
+            super::DEFAULT_ENDPOINT,
+            std::path::Path::new("fixture-profile"),
+        );
+        assert!(!args
+            .iter()
+            .any(|arg| arg.starts_with("--window-position=") || arg.starts_with("--window-size=")));
+        assert!(args.iter().any(|arg| arg == "--no-startup-window"));
+        assert!(args.iter().any(|arg| arg == "--no-default-browser-check"));
+    }
 
     #[test]
     fn accepts_and_canonicalizes_loopback_cdp_endpoint() {
