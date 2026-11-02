@@ -58,8 +58,10 @@ function categoryUpdateArgs(original: ReminderCategory, modified: ReminderCatego
 }
 
 export function createReminderCollections(queryClient: QueryClient, endpoint: string, enabled = true) {
+  // Cleanup belongs to this collection pair, including after an endpoint is revisited.
+  const owner = crypto.randomUUID();
   const reminders = createCollection(queryCollectionOptions({
-    queryKey: ['reminders', endpoint],
+    queryKey: ['reminders', endpoint, owner],
     queryFn: () => reminderOperation<ReminderList>('list', { limit: 500, all: true }, endpoint),
     select: (data: ReminderList) => data.reminders,
     queryClient,
@@ -85,7 +87,7 @@ export function createReminderCollections(queryClient: QueryClient, endpoint: st
   }));
 
   const categories = createCollection(queryCollectionOptions({
-    queryKey: ['reminder-categories', endpoint],
+    queryKey: ['reminder-categories', endpoint, owner],
     queryFn: () => reminderOperation<CategoryList>('list_categories', {}, endpoint),
     select: (data: CategoryList) => data.categories,
     queryClient,

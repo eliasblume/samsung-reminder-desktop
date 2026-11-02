@@ -145,3 +145,11 @@ Attachment upload, voice capture, map search/geocoding, and Samsung's suggested-
 ## License
 
 [MIT](LICENSE) © 2026 eliasblume
+
+## Contributing translations
+
+The desktop UI supports English and Russian, with a persisted **Settings → Language** choice or automatic system-language selection. Changing the UI language leaves reminder and custom-list contents unchanged.
+
+Translations live in separate `src/i18n/en.json` and `src/i18n/ru.json` catalogs. Use semantic keys (for example `settings.title`), named interpolation parameters such as `{name}`, and plural objects selected by numeric `{count}`. Keep Russian coverage complete: every English key must have a nonempty translation with matching parameters; Russian plural messages require `one`, `few`, `many`, and `other` forms.
+
+To register another language, add its JSON catalog and update the language types, system-locale resolution, catalog registration, locale formatting, settings selector, and plural validation in `src/i18n` and the UI. Add coverage for its plural rules and fallback behavior. Run `pnpm test:frontend` and `pnpm typecheck` before submitting a translation change. The frontend tests run independently of Tauri, Samsung Cloud, and browser credentials.

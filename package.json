@@ -21,6 +21,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
+    "test:frontend": "node --experimental-strip-types --test --test-reporter=spec tests/*.test.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build -- --locked",

@@ -1,3 +1,4 @@
+import { t, useI18n, getLocale, formatNumber } from './i18n';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@tanstack/react-db';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -85,14 +86,14 @@ function hasStoredConsent() {
   }
 }
 
-const categoryDefinitions = [
-  { id: 'today' as const, label: 'Today', icon: CalendarDays, color: '#ff6f7d', wash: '#fff0f2' },
-  { id: 'scheduled' as const, label: 'Scheduled', icon: Clock3, color: '#43cbd0', wash: '#eafafa' },
-  { id: 'important' as const, label: 'Important', icon: Star, color: '#ffc928', wash: '#fff8df' },
-  { id: 'place' as const, label: 'Place', icon: MapPin, color: '#59aef2', wash: '#edf7ff' },
-  { id: 'no-alert' as const, label: 'No alert', icon: Bell, color: '#8e6bea', wash: '#f3efff' },
-  { id: 'completed' as const, label: 'Completed', icon: CheckCircle2, color: '#94979a', wash: '#f1f2f3' },
-];
+function getCategoryDefinitions() { return [
+  { id: 'today' as const, label: t("ui.today"), icon: CalendarDays, color: '#ff6f7d', wash: '#fff0f2' },
+  { id: 'scheduled' as const, label: t("ui.scheduled"), icon: Clock3, color: '#43cbd0', wash: '#eafafa' },
+  { id: 'important' as const, label: t("ui.important"), icon: Star, color: '#ffc928', wash: '#fff8df' },
+  { id: 'place' as const, label: t("ui.place"), icon: MapPin, color: '#59aef2', wash: '#edf7ff' },
+  { id: 'no-alert' as const, label: t("ui.no_alert"), icon: Bell, color: '#8e6bea', wash: '#f3efff' },
+  { id: 'completed' as const, label: t("ui.completed"), icon: CheckCircle2, color: '#94979a', wash: '#f1f2f3' },
+]; }
 
 function sameLocalDay(iso: string | null) {
   if (!iso) return false;
@@ -135,47 +136,47 @@ function scheduleInput(reminder: Reminder | null) {
 function errorMessage(error: unknown) {
   if (typeof error === 'string') return error;
   if (error instanceof Error) return error.message;
-  return 'Samsung Reminder could not connect.';
+  return t("ui.samsung_reminder_could_not_connect");
 }
 
 function connectionIssue(error: unknown) {
   const message = errorMessage(error);
   if (message.includes('SAMSUNG_BROWSER_NOT_FOUND')) {
     return {
-      title: 'Samsung Browser was not found',
-      detail: 'Install Samsung Browser for Windows in its standard location, open it once, then retry.',
-      action: 'Check again',
+      title: t("ui.samsung_browser_was_not_found"),
+      detail: t("ui.install_samsung_browser_for_windows_in_its_standard_location_open_it_once_then_retry"),
+      action: t("ui.check_again"),
       icon: TriangleAlert,
     };
   }
   if (message.includes('SAMSUNG_PROFILE_NOT_READY')) {
     return {
-      title: 'Samsung Browser needs setup',
-      detail: 'Open Samsung Browser once to initialize its profile, close it, then retry here.',
-      action: 'I opened it — retry',
+      title: t("ui.samsung_browser_needs_setup"),
+      detail: t("ui.open_samsung_browser_once_to_initialize_its_profile_close_it_then_retry_here"),
+      action: t("ui.i_opened_it_retry"),
       icon: TriangleAlert,
     };
   }
   if (message.includes('SAMSUNG_ACCOUNT_NOT_SIGNED_IN')) {
     return {
-      title: 'Samsung account sign-in required',
-      detail: 'Sign in to your Samsung account in Samsung Browser, close the browser, then retry.',
-      action: 'I signed in — retry',
+      title: t("ui.samsung_account_sign_in_required"),
+      detail: t("ui.sign_in_to_your_samsung_account_in_samsung_browser_close_the_browser_then_retry"),
+      action: t("ui.i_signed_in_retry"),
       icon: LogIn,
     };
   }
   if (message.includes('SAMSUNG_BROWSER_BUSY')) {
     return {
-      title: 'Samsung Browser is already in use',
-      detail: 'Close Samsung Browser completely so the hidden sync helper can use its signed-in profile, then retry.',
-      action: 'I closed it — retry',
+      title: t("ui.samsung_browser_is_already_in_use"),
+      detail: t("ui.close_samsung_browser_completely_so_the_hidden_sync_helper_can_use_its_signed_in_profile_then_retry"),
+      action: t("ui.i_closed_it_retry"),
       icon: TriangleAlert,
     };
   }
   return {
-    title: 'Samsung sync unavailable',
-    detail: message.replace(/^[A-Z_]+:\s*/, ''),
-    action: 'Retry sync',
+    title: t("ui.samsung_sync_unavailable"),
+    detail: t("error.syncDetail"),
+    action: t("ui.retry_sync"),
     icon: TriangleAlert,
   };
 }
@@ -283,6 +284,7 @@ function OneUiDatePicker({ value, onChange, includeTime = true, disabled = false
   includeTime?: boolean;
   disabled?: boolean;
 }) {
+  useI18n();
   const selected = pickerDate(value, includeTime);
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => {
@@ -301,10 +303,10 @@ function OneUiDatePicker({ value, onChange, includeTime = true, disabled = false
     return Array.from({ length: 42 }, (_, index) => new Date(first.getFullYear(), first.getMonth(), first.getDate() + index));
   }, [viewMonth]);
   const display = selected
-    ? new Intl.DateTimeFormat(undefined, includeTime
+    ? new Intl.DateTimeFormat(getLocale(), includeTime
       ? { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
       : { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(selected)
-    : includeTime ? 'Set date & time' : 'Choose date';
+    : includeTime ? t("ui.set_date_time") : t("ui.choose_date");
 
   function chooseDay(day: Date) {
     const next = selected ? new Date(selected) : new Date();
@@ -334,11 +336,11 @@ function OneUiDatePicker({ value, onChange, includeTime = true, disabled = false
       <Popover.Portal>
         <Popover.Content side="left" align="start" sideOffset={18} collisionPadding={16} className="date-picker-popover">
           <div className="date-picker-header">
-            <button type="button" aria-label="Previous month" onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}><ChevronLeft size={18} /></button>
-            <strong>{new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(viewMonth)}</strong>
-            <button type="button" aria-label="Next month" onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}><ChevronRight size={18} /></button>
+            <button type="button" aria-label={t("ui.previous_month")} onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}><ChevronLeft size={18} /></button>
+            <strong>{new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric' }).format(viewMonth)}</strong>
+            <button type="button" aria-label={t("ui.next_month")} onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}><ChevronRight size={18} /></button>
           </div>
-          <div className="calendar-weekdays">{['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
+          <div className="calendar-weekdays">{Array.from({ length: 7 }, (_, index) => <span key={index}>{new Intl.DateTimeFormat(getLocale(), { weekday: 'short' }).format(new Date(2026, 10, 2 + index))}</span>)}</div>
           <div className="calendar-grid">
             {calendarDays.map((day) => {
               const isSelected = selected && day.toDateString() === selected.toDateString();
@@ -348,11 +350,11 @@ function OneUiDatePicker({ value, onChange, includeTime = true, disabled = false
                 <button
                   type="button"
                   key={day.toISOString()}
-                  aria-label={new Intl.DateTimeFormat(undefined, { dateStyle: 'full' }).format(day)}
+                  aria-label={new Intl.DateTimeFormat(getLocale(), { dateStyle: 'full' }).format(day)}
                   className={`${isSelected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''} ${outside ? 'is-outside' : ''}`}
                   onClick={() => chooseDay(day)}
                 >
-                  {day.getDate()}
+                  {formatNumber(day.getDate())}
                 </button>
               );
             })}
@@ -360,16 +362,16 @@ function OneUiDatePicker({ value, onChange, includeTime = true, disabled = false
           {includeTime ? (
             <div className="date-picker-time">
               <Clock3 size={17} />
-              <span>Time</span>
+              <span>{t("ui.time")}</span>
               <OneUiSelect
-                ariaLabel="Hour"
+                ariaLabel={t("ui.hour")}
                 value={String(selected?.getHours() ?? new Date().getHours())}
                 onChange={(next) => setTime('hour', Number(next))}
                 options={Array.from({ length: 24 }, (_, hour) => ({ value: String(hour), label: padNumber(hour) }))}
               />
               <span>:</span>
               <OneUiSelect
-                ariaLabel="Minute"
+                ariaLabel={t("ui.minute")}
                 value={String(selected?.getMinutes() ?? 0)}
                 onChange={(next) => setTime('minute', Number(next))}
                 options={Array.from({ length: 60 }, (_, minute) => ({ value: String(minute), label: padNumber(minute) }))}
@@ -377,9 +379,9 @@ function OneUiDatePicker({ value, onChange, includeTime = true, disabled = false
             </div>
           ) : null}
           <div className="date-picker-actions">
-            <button type="button" onClick={() => onChange('')}>Clear</button>
-            <button type="button" onClick={() => { onChange(pickerValue(new Date(), includeTime)); setViewMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); }}>Today</button>
-            <button type="button" className="is-primary" onClick={() => setOpen(false)}>Done</button>
+            <button type="button" onClick={() => onChange('')}>{t("ui.clear")}</button>
+            <button type="button" onClick={() => { onChange(pickerValue(new Date(), includeTime)); setViewMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); }}>{t("ui.today")}</button>
+            <button type="button" className="is-primary" onClick={() => setOpen(false)}>{t("ui.done")}</button>
           </div>
           <Popover.Arrow className="date-picker-arrow" />
         </Popover.Content>
@@ -389,23 +391,22 @@ function OneUiDatePicker({ value, onChange, includeTime = true, disabled = false
 }
 
 function formatRepeat(repeat: RepeatConfig | null) {
-  if (!repeat || repeat.unit === 'none') return 'Does not repeat';
-  const plural = repeat.interval === 1 ? repeat.unit : `${repeat.unit}s`;
-  let label = `Every ${repeat.interval} ${plural}`;
-  if (repeat.count) label += `, ${repeat.count} times`;
-  if (repeat.until) label += `, until ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(repeat.until))}`;
+  if (!repeat || repeat.unit === 'none') return t("ui.does_not_repeat");
+  let label = t(`repeat.every.${repeat.unit}`, { count: repeat.interval });
+  if (repeat.count) label += t("repeat.count", { count: repeat.count });
+  if (repeat.until) label += t('repeat.until', { date: new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium' }).format(new Date(repeat.until)) });
   return label;
 }
 
 function reminderGroupLabel(reminder: Reminder) {
   const value = reminder.reminderAt || reminder.startsAt;
-  if (!value) return reminder.hasLocation ? 'Place' : 'No alert';
+  if (!value) return reminder.hasLocation ? t("ui.place") : t("ui.no_alert");
   const date = new Date(value);
   const now = new Date();
   if (date.getFullYear() === now.getFullYear()) {
-    return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date);
+    return new Intl.DateTimeFormat(getLocale(), { month: 'short' }).format(date);
   }
-  return new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat(getLocale(), { month: 'short', year: 'numeric' }).format(date);
 }
 
 function categoryVisual(category: ReminderCategory) {
@@ -418,13 +419,13 @@ function categoryVisual(category: ReminderCategory) {
 
 function formatWhen(reminder: Reminder) {
   const value = reminder.reminderAt || reminder.startsAt;
-  if (!value) return reminder.hasLocation ? reminder.locationAddress || 'Location reminder' : 'No alert';
+  if (!value) return reminder.hasLocation ? reminder.locationAddress || t("ui.location_reminder") : t("ui.no_alert");
   const date = new Date(value);
   if (reminder.allDay) {
-    return `All day · ${new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(date)}`;
+    return t('schedule.allDay', { date: new Intl.DateTimeFormat(getLocale(), { weekday: 'short', month: 'short', day: 'numeric' }).format(date) });
   }
   const today = sameLocalDay(value);
-  return new Intl.DateTimeFormat(undefined, today
+  return new Intl.DateTimeFormat(getLocale(), today
     ? { hour: 'numeric', minute: '2-digit' }
     : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     .format(date);
@@ -457,6 +458,7 @@ function CategoryIconPicker({ value, color, label, disabled = false, onChange }:
   disabled?: boolean;
   onChange: (value: number) => void;
 }) {
+  useI18n();
   const [open, setOpen] = useState(false);
   const selected = categoryIcon(value);
   const SelectedIcon = selected.icon;
@@ -483,7 +485,7 @@ function CategoryIconPicker({ value, color, label, disabled = false, onChange }:
           className="category-icon-popover"
         >
           <div className="category-icon-popover-heading">
-            <strong>Choose icon</strong>
+            <strong>{t("ui.choose_icon")}</strong>
             <span>{selected.label}</span>
           </div>
           <div className="category-icon-grid">
@@ -518,6 +520,7 @@ function CategoryCard({ definition, count, selected, onSelect }: {
   selected: boolean;
   onSelect: () => void;
 }) {
+  useI18n();
   const Icon = definition.icon;
   return (
     <button
@@ -530,7 +533,7 @@ function CategoryCard({ definition, count, selected, onSelect }: {
       <span className="category-icon"><Icon size={21} strokeWidth={2.5} fill={definition.id === 'important' ? 'currentColor' : 'none'} /></span>
       <span className="mt-auto flex w-full items-end justify-between gap-2">
         <span className="text-[14px] font-medium text-ink/66">{definition.label}</span>
-        <span className="text-[20px] font-semibold tracking-[-0.04em] text-ink">{count}</span>
+        <span className="text-[20px] font-semibold tracking-[-0.04em] text-ink">{formatNumber(count)}</span>
       </span>
     </button>
   );
@@ -542,12 +545,13 @@ function ReminderRow({ reminder, selected, onSelect, onToggle }: {
   onSelect: () => void;
   onToggle: () => void;
 }) {
+  useI18n();
   return (
     <article className={`reminder-row ${selected ? 'is-selected' : ''}`}>
       <button
         type="button"
         className="completion-button"
-        aria-label={reminder.completed ? 'Mark incomplete' : 'Mark complete'}
+        aria-label={reminder.completed ? t("ui.mark_incomplete") : t("ui.mark_complete")}
         onClick={(event) => { event.stopPropagation(); onToggle(); }}
       >
         {reminder.completed ? <Check size={17} strokeWidth={3} /> : null}
@@ -560,7 +564,7 @@ function ReminderRow({ reminder, selected, onSelect, onToggle }: {
           {reminder.hasLocation ? <MapPin size={13} /> : reminder.allDay ? <CalendarDays size={13} /> : reminder.reminderAt || reminder.startsAt ? <Clock3 size={13} /> : <Bell size={13} />}
           {formatWhen(reminder)}
           {reminder.text ? <><span aria-hidden>·</span><span className="truncate">{reminder.text}</span></> : null}
-          {reminder.checklist.length ? <><span aria-hidden>·</span><span>{reminder.checklist.filter((item) => item.done).length}/{reminder.checklist.length} done</span></> : null}
+          {reminder.checklist.length ? <><span aria-hidden>·</span><span>{t("checklist.progress", { done: formatNumber(reminder.checklist.filter((item) => item.done).length), total: formatNumber(reminder.checklist.length) })}</span></> : null}
         </span>
         {reminder.repeat ? (
           <span className="mt-1 flex items-center gap-1.5 truncate text-[12px] text-muted">
@@ -583,6 +587,7 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
   open: boolean;
   onClose: () => void;
 }) {
+  useI18n();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -654,8 +659,8 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
           <div className="mx-auto mb-5 grid size-16 place-items-center rounded-[22px] bg-violet-soft text-violet">
             <Bell size={28} strokeWidth={2.2} />
           </div>
-          <h2 className="text-[19px] font-semibold text-ink">Choose a reminder</h2>
-          <p className="mt-2 text-sm leading-6 text-muted">Select an item to see its notes and make changes.</p>
+          <h2 className="text-[19px] font-semibold text-ink">{t("ui.choose_a_reminder")}</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">{t("ui.select_an_item_to_see_its_notes_and_make_changes")}</p>
         </div>
       </aside>
     );
@@ -708,7 +713,7 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
     || alertType !== reminder.alertType || categoryId !== (reminder.categoryId || 'LOCAL_SPACE');
 
   const selectedCategory = categories.find((category) => category.id === categoryId)
-    || { id: 'LOCAL_SPACE', name: 'My reminders', color: 0, iconIndex: 0, order: -1, extensionInfo: null };
+    || { id: 'LOCAL_SPACE', name: t("ui.my_reminders"), color: 0, iconIndex: 0, order: -1, extensionInfo: null };
   const selectedCategoryVisual = categoryVisual(selectedCategory);
   const SelectedCategoryIcon = selectedCategoryVisual.icon;
 
@@ -736,7 +741,7 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
 
   async function shareReminder() {
     const schedule = scheduledAt
-      ? `\n${allDay ? new Date(`${scheduledAt}T12:00:00`).toLocaleDateString() : new Date(scheduledAt).toLocaleString()}`
+      ? `\n${allDay ? new Date(`${scheduledAt}T12:00:00`).toLocaleDateString(getLocale()) : new Date(scheduledAt).toLocaleString(getLocale())}`
       : '';
     const checks = normalizedChecklist.length ? `\n${normalizedChecklist.map((item) => `${item.done ? '✓' : '○'} ${item.text}`).join('\n')}` : '';
     const place = locationEnabled && locationAddress ? `\n${locationAddress}` : '';
@@ -748,17 +753,17 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
   return (
     <aside className={`inspector hidden lg:flex ${open ? 'is-drawer' : ''}`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-[0.11em] text-muted">Details</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.11em] text-muted">{t("ui.details")}</span>
         <div className="flex items-center gap-1">
           <button
             type="button"
             className={`favorite-button ${favorite ? 'is-active' : ''}`}
             onClick={() => setFavorite((value) => !value)}
-            aria-label={favorite ? 'Remove from important' : 'Mark important'}
+            aria-label={favorite ? t("ui.remove_from_important") : t("ui.mark_important")}
           >
             <Star size={19} fill={favorite ? 'currentColor' : 'none'} />
           </button>
-          <button type="button" className="icon-button drawer-close" aria-label="Close details" onClick={onClose}>
+          <button type="button" className="icon-button drawer-close" aria-label={t("ui.close_details")} onClick={onClose}>
             <X size={18} />
           </button>
         </div>
@@ -770,7 +775,7 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
             type="button"
             className={`inspector-check ${completed ? 'is-complete' : ''}`}
             onClick={() => setCompleted((value) => !value)}
-            aria-label={completed ? 'Mark incomplete' : 'Mark complete'}
+            aria-label={completed ? t("ui.mark_incomplete") : t("ui.mark_complete")}
           >
             {completed ? <Check size={18} strokeWidth={3} /> : null}
           </button>
@@ -779,21 +784,21 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             rows={2}
-            aria-label="Reminder title"
+            aria-label={t("ui.reminder_title")}
           />
         </div>
         <Separator.Root className="my-7 h-px bg-line" />
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold uppercase tracking-[0.11em] text-muted" htmlFor="notes">Notes</label>
+          <label className="text-xs font-semibold uppercase tracking-[0.11em] text-muted" htmlFor="notes">{t("ui.notes")}</label>
           <button type="button" className="text-button" onClick={() => checklistInputRef.current?.focus()}>
-            <Plus size={14} /> Add to-do
+            <Plus size={14} /> {t("ui.add_to_do")}
           </button>
         </div>
         <textarea
           id="notes"
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder="Add notes"
+          placeholder={t("ui.add_notes")}
           className="notes-editor mt-3 min-h-36 resize-none rounded-[20px] bg-canvas px-4 py-3.5 text-sm leading-6 text-ink placeholder:text-muted/60"
         />
         <div className="checklist-editor">
@@ -804,7 +809,7 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
                 <button
                   type="button"
                   className={item.done ? 'is-done' : ''}
-                  aria-label={item.done ? 'Mark checklist item incomplete' : 'Mark checklist item complete'}
+                  aria-label={item.done ? t("ui.mark_checklist_item_incomplete") : t("ui.mark_checklist_item_complete")}
                   onClick={() => setChecklist((items) => items.map((entry, itemIndex) => itemIndex === index ? { ...entry, done: !entry.done } : entry))}
                 >
                   {item.done ? <Check size={13} strokeWidth={3} /> : null}
@@ -812,18 +817,18 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
                 <input
                   value={item.text}
                   className={item.done ? 'is-done' : ''}
-                  placeholder="Checklist item"
+                  placeholder={t("ui.checklist_item")}
                   onChange={(event) => setChecklist((items) => items.map((entry, itemIndex) => itemIndex === index ? { ...entry, text: event.target.value } : entry))}
                 />
-                <button type="button" aria-label="Remove checklist item" onClick={() => setChecklist((items) => items.filter((_, itemIndex) => itemIndex !== index))}><X size={14} /></button>
+                <button type="button" aria-label={t("ui.remove_checklist_item")} onClick={() => setChecklist((items) => items.filter((_, itemIndex) => itemIndex !== index))}><X size={14} /></button>
               </div>
             ))}
             </div>
-          ) : <p className="checklist-empty">No to-do items yet.</p>}
+          ) : <p className="checklist-empty">{t("ui.no_to_do_items_yet")}</p>}
           <div className="checklist-composer">
             <Plus size={16} />
-            <input ref={checklistInputRef} value={newChecklistText} onChange={(event) => setNewChecklistText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addChecklistItem(); } }} placeholder="Add a to-do item" aria-label="New to-do item" />
-            <button type="button" disabled={!newChecklistText.trim()} onClick={addChecklistItem}>Add</button>
+            <input ref={checklistInputRef} value={newChecklistText} onChange={(event) => setNewChecklistText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addChecklistItem(); } }} placeholder={t("ui.add_a_to_do_item")} aria-label={t("ui.new_to_do_item")} />
+            <button type="button" disabled={!newChecklistText.trim()} onClick={addChecklistItem}>{t("ui.add")}</button>
           </div>
         </div>
         <div className="mt-5 space-y-3">
@@ -831,9 +836,9 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
             <CalendarDays size={18} className="mt-2 text-scheduled" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3">
-                <span className="detail-control-label">{repeatUnit === 'none' ? (allDay ? 'Date' : 'Date & time') : 'First reminder'}</span>
+                <span className="detail-control-label">{repeatUnit === 'none' ? (allDay ? t("ui.date") : t("ui.date_time")) : t("ui.first_reminder")}</span>
                 <label className="all-day-toggle">
-                  <span>All day</span>
+                  <span>{t("ui.all_day")}</span>
                   <Switch.Root
                     className="switch-root"
                     checked={allDay}
@@ -844,7 +849,7 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
                       }
                       if (checked && (repeatUnit === 'minute' || repeatUnit === 'hour')) setRepeatUnit('day');
                     }}
-                    aria-label="All-day reminder"
+                    aria-label={t("ui.all_day_reminder")}
                   >
                     <Switch.Thumb className="switch-thumb" />
                   </Switch.Root>
@@ -867,18 +872,18 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
           <div className="detail-control items-start">
             <BellRing size={18} className="mt-2 text-violet" />
             <div className="min-w-0 flex-1">
-              <span className="detail-control-label">Early alert</span>
+              <span className="detail-control-label">{t("ui.early_alert")}</span>
               <OneUiSelect
                 className="early-alert-preset mt-2"
-                ariaLabel="Early alert"
+                ariaLabel={t("ui.early_alert")}
                 value={earlyPreset}
                 disabled={!scheduledAt}
                 onChange={(next) => setEarlyPreset(next as typeof earlyPreset)}
                 options={[
-                  { value: 'none', label: 'No early alert' },
-                  { value: 'day', label: '1 day before' },
-                  { value: 'week', label: '1 week before' },
-                  { value: 'custom', label: 'Custom' },
+                  { value: 'none', label: t("ui.no_early_alert") },
+                  { value: 'day', label: t("ui.1_day_before") },
+                  { value: 'week', label: t("ui.1_week_before") },
+                  { value: 'custom', label: t("ui.custom") },
                 ]}
               />
               {earlyPreset === 'custom' && scheduledAt ? (
@@ -889,25 +894,25 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
                     max={999}
                     value={earlyOffset}
                     onChange={(event) => setEarlyOffset(Number(event.target.value) || 1)}
-                    aria-label="Early alert offset"
+                    aria-label={t("ui.early_alert_offset")}
                   />
                   <OneUiSelect
-                    ariaLabel="Early alert unit"
+                    ariaLabel={t("ui.early_alert_unit")}
                     value={earlyUnit}
                     onChange={(next) => setEarlyUnit(next as EarlyAlert['unit'])}
                     options={[
-                      { value: 'm', label: 'minutes' },
-                      { value: 'h', label: 'hours' },
-                      { value: 'd', label: 'days' },
-                      { value: 'w', label: 'weeks' },
-                      { value: 'mo', label: 'months' },
-                      { value: 'y', label: 'years' },
+                      { value: 'm', label: t("early.unit.m", { count: earlyOffset }) },
+                      { value: 'h', label: t("early.unit.h", { count: earlyOffset }) },
+                      { value: 'd', label: t("early.unit.d", { count: earlyOffset }) },
+                      { value: 'w', label: t("early.unit.w", { count: earlyOffset }) },
+                      { value: 'mo', label: t("early.unit.mo", { count: earlyOffset }) },
+                      { value: 'y', label: t("early.unit.y", { count: earlyOffset }) },
                     ]}
                   />
                   {allDay ? (
                     <label className="early-alert-time">
-                      <span>at</span>
-                      <input type="time" value={earlyTime} onChange={(event) => setEarlyTime(event.target.value)} aria-label="Early alert time" />
+                      <span>{t("ui.at")}</span>
+                      <input type="time" value={earlyTime} onChange={(event) => setEarlyTime(event.target.value)} aria-label={t("ui.early_alert_time")} />
                     </label>
                   ) : null}
                 </div>
@@ -918,34 +923,34 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
           <div className="detail-control items-start">
             <Repeat2 size={18} className="mt-2 text-violet" />
             <div className="min-w-0 flex-1">
-              <span className="detail-control-label">Repeat</span>
+              <span className="detail-control-label">{t("ui.repeat")}</span>
               <div className="repeat-mode mt-2">
-                <button type="button" className={repeatUnit === 'none' ? 'is-active' : ''} onClick={() => setRepeatUnit('none')}>Don’t repeat</button>
-                <button type="button" disabled={!scheduledAt} className={repeatUnit !== 'none' ? 'is-active' : ''} onClick={() => setRepeatUnit(repeatUnit === 'none' ? 'day' : repeatUnit)}>Repeat</button>
+                <button type="button" className={repeatUnit === 'none' ? 'is-active' : ''} onClick={() => setRepeatUnit('none')}>{t("ui.don_t_repeat")}</button>
+                <button type="button" disabled={!scheduledAt} className={repeatUnit !== 'none' ? 'is-active' : ''} onClick={() => setRepeatUnit(repeatUnit === 'none' ? 'day' : repeatUnit)}>{t("ui.repeat")}</button>
               </div>
               {repeatUnit !== 'none' ? (
                 <>
                   <div className="repeat-sentence">
-                    <span>Every</span>
-                    <input type="number" min={1} max={999} value={repeatInterval} onChange={(event) => setRepeatInterval(Number(event.target.value) || 1)} aria-label="Repeat interval" />
+                    <span>{t("ui.every")}</span>
+                    <input type="number" min={1} max={999} value={repeatInterval} onChange={(event) => setRepeatInterval(Number(event.target.value) || 1)} aria-label={t("ui.repeat_interval")} />
                     <OneUiSelect
-                      ariaLabel="Repeat unit"
+                      ariaLabel={t("ui.repeat_unit")}
                       value={repeatUnit}
                       onChange={(next) => setRepeatUnit(next as RepeatConfig['unit'])}
                       options={(allDay ? ['day', 'week', 'month', 'year'] as const : ['minute', 'hour', 'day', 'week', 'month', 'year'] as const).map((unit) => ({
                         value: unit,
-                        label: `${unit}${repeatInterval === 1 ? '' : 's'}`,
+                        label: t(`repeat.unit.${unit}`, { count: repeatInterval }),
                       }))}
                     />
                   </div>
                   {repeatUnit === 'week' ? (
                     <div className="repeat-anchor">
-                      <span>On</span>
+                      <span>{t("repeat.weekdayLabel")}</span>
                       <OneUiSelect
-                        ariaLabel="Repeat weekday"
+                        ariaLabel={t("ui.repeat_weekday")}
                         value={repeatWeekday}
                         onChange={setRepeatWeekday}
-                        options={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((label, index) => ({
+                        options={[t("ui.monday"), t("ui.tuesday"), t("ui.wednesday"), t("ui.thursday"), t("ui.friday"), t("ui.saturday"), t("ui.sunday")].map((label, index) => ({
                           value: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'][index],
                           label,
                         }))}
@@ -954,49 +959,49 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
                   ) : null}
                   {repeatUnit === 'month' ? (
                     <div className="repeat-anchor">
-                      <span>On day</span>
+                      <span>{t("ui.on_day")}</span>
                       <OneUiSelect
-                        ariaLabel="Day of month"
+                        ariaLabel={t("ui.day_of_month")}
                         value={String(repeatMonthDay)}
                         onChange={(next) => setRepeatMonthDay(Number(next))}
-                        options={Array.from({ length: 31 }, (_, day) => ({ value: String(day + 1), label: String(day + 1) }))}
+                        options={Array.from({ length: 31 }, (_, day) => ({ value: String(day + 1), label: formatNumber(day + 1) }))}
                       />
-                      <span>of the month</span>
+                      <span>{t("ui.of_the_month")}</span>
                     </div>
                   ) : null}
                   {repeatUnit === 'year' ? (
                     <div className="repeat-anchor">
-                      <span>On</span>
+                      <span>{t("repeat.monthLabel")}</span>
                       <OneUiSelect
-                        ariaLabel="Repeat month"
+                        ariaLabel={t("ui.repeat_month")}
                         value={String(repeatMonth)}
                         onChange={(next) => setRepeatMonth(Number(next))}
                         options={Array.from({ length: 12 }, (_, month) => ({
                           value: String(month + 1),
-                          label: new Intl.DateTimeFormat(undefined, { month: 'long' }).format(new Date(2026, month, 1)),
+                          label: new Intl.DateTimeFormat(getLocale(), { month: 'long' }).format(new Date(2026, month, 1)),
                         }))}
                       />
                       <OneUiSelect
-                        ariaLabel="Day of month"
+                        ariaLabel={t("ui.day_of_month")}
                         value={String(repeatMonthDay)}
                         onChange={(next) => setRepeatMonthDay(Number(next))}
-                        options={Array.from({ length: 31 }, (_, day) => ({ value: String(day + 1), label: String(day + 1) }))}
+                        options={Array.from({ length: 31 }, (_, day) => ({ value: String(day + 1), label: formatNumber(day + 1) }))}
                       />
                     </div>
                   ) : null}
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <OneUiSelect
                       className="detail-select"
-                      ariaLabel="Repeat duration"
+                      ariaLabel={t("ui.repeat_duration")}
                       value={repeatEnd}
                       onChange={(next) => setRepeatEnd(next as typeof repeatEnd)}
                       options={[
-                        { value: 'forever', label: 'Forever' },
-                        { value: 'count', label: 'Number of times' },
-                        { value: 'until', label: 'Until date' },
+                        { value: 'forever', label: t("ui.forever") },
+                        { value: 'count', label: t("ui.number_of_times") },
+                        { value: 'until', label: t("ui.until_date") },
                       ]}
                     />
-                    {repeatEnd === 'count' ? <input className="detail-input" type="number" min={1} max={9999} value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value) || 1)} aria-label="Repeat count" /> : null}
+                    {repeatEnd === 'count' ? <input className="detail-input" type="number" min={1} max={9999} value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value) || 1)} aria-label={t("ui.repeat_count")} /> : null}
                     {repeatEnd === 'until' ? <OneUiDatePicker value={repeatUntil} onChange={setRepeatUntil} includeTime={false} /> : null}
                   </div>
                 </>
@@ -1008,27 +1013,27 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
             <MapPin size={18} className="mt-2 text-place" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3">
-                <span className="detail-control-label">Place</span>
-                <Switch.Root className="switch-root" checked={locationEnabled} onCheckedChange={setLocationEnabled} aria-label="Enable place trigger">
+                <span className="detail-control-label">{t("ui.place")}</span>
+                <Switch.Root className="switch-root" checked={locationEnabled} onCheckedChange={setLocationEnabled} aria-label={t("ui.enable_place_trigger")}>
                   <Switch.Thumb className="switch-thumb" />
                 </Switch.Root>
               </div>
               {locationEnabled ? (
                 <div className="location-editor">
-                  <input className="detail-input" value={locationAddress} onChange={(event) => setLocationAddress(event.target.value)} placeholder="Place or address" aria-label="Place address" />
+                  <input className="detail-input" value={locationAddress} onChange={(event) => setLocationAddress(event.target.value)} placeholder={t("ui.place_or_address")} aria-label={t("ui.place_address")} />
                   <div className="grid grid-cols-2 gap-2">
-                    <input className="detail-input" inputMode="decimal" value={locationLatitude} onChange={(event) => setLocationLatitude(event.target.value)} placeholder="Latitude" aria-label="Latitude" />
-                    <input className="detail-input" inputMode="decimal" value={locationLongitude} onChange={(event) => setLocationLongitude(event.target.value)} placeholder="Longitude" aria-label="Longitude" />
+                    <input className="detail-input" inputMode="decimal" value={locationLatitude} onChange={(event) => setLocationLatitude(event.target.value)} placeholder={t("ui.latitude")} aria-label={t("ui.latitude")} />
+                    <input className="detail-input" inputMode="decimal" value={locationLongitude} onChange={(event) => setLocationLongitude(event.target.value)} placeholder={t("ui.longitude")} aria-label={t("ui.longitude")} />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <OneUiSelect
                       className="detail-select"
-                      ariaLabel="Place transition"
+                      ariaLabel={t("ui.place_transition")}
                       value={String(locationTransition)}
                       onChange={(next) => setLocationTransition(Number(next))}
-                      options={[{ value: '1', label: 'Arriving' }, { value: '2', label: 'Leaving' }]}
+                      options={[{ value: '1', label: t("ui.arriving") }, { value: '2', label: t("ui.leaving") }]}
                     />
-                    <label className="radius-input"><input type="number" min={50} max={5000} value={locationRadius} onChange={(event) => setLocationRadius(Number(event.target.value) || 200)} aria-label="Place radius" /><span>m</span></label>
+                    <label className="radius-input"><input type="number" min={50} max={5000} value={locationRadius} onChange={(event) => setLocationRadius(Number(event.target.value) || 200)} aria-label={t("ui.place_radius")} /><span>{t("ui.m")}</span></label>
                   </div>
                   <button
                     type="button"
@@ -1037,12 +1042,12 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
                     onClick={() => navigator.geolocation?.getCurrentPosition((position) => {
                       setLocationLatitude(position.coords.latitude.toFixed(6));
                       setLocationLongitude(position.coords.longitude.toFixed(6));
-                      if (!locationAddress) setLocationAddress('Current location');
+                      if (!locationAddress) setLocationAddress(t("ui.current_location"));
                     })}
                   >
-                    <MapPin size={14} /> Use current location
+                    <MapPin size={14} /> {t("ui.use_current_location")}
                   </button>
-                  {!locationValid ? <p className="text-[11px] leading-4 text-danger">Latitude and longitude are required for a Samsung place trigger.</p> : null}
+                  {!locationValid ? <p className="text-[11px] leading-4 text-danger">{t("ui.latitude_and_longitude_are_required_for_a_samsung_place_trigger")}</p> : null}
                 </div>
               ) : null}
             </div>
@@ -1050,29 +1055,29 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
 
           <div className="detail-control">
             <Volume2 size={18} className="text-important" />
-            <span className="detail-control-label">Alert</span>
+            <span className="detail-control-label">{t("ui.alert")}</span>
             <OneUiSelect
               className="detail-select"
-              ariaLabel="Alert strength"
+              ariaLabel={t("ui.alert_strength")}
               value={String(alertType)}
               onChange={(next) => setAlertType(Number(next) as 0 | 16 | 17)}
-              options={[{ value: '0', label: 'Weak' }, { value: '16', label: 'Medium' }, { value: '17', label: 'Strong' }]}
+              options={[{ value: '0', label: t("ui.weak") }, { value: '16', label: t("ui.medium") }, { value: '17', label: t("ui.strong") }]}
             />
           </div>
 
           <div className="detail-control">
             <SelectedCategoryIcon size={18} style={{ color: selectedCategoryVisual.color }} />
-            <span className="detail-control-label">List</span>
+            <span className="detail-control-label">{t("ui.list")}</span>
             <OneUiSelect
               className="detail-select"
-              ariaLabel="Reminder list"
+              ariaLabel={t("ui.reminder_list")}
               value={categoryId}
               onChange={setCategoryId}
               options={categories.map((category) => {
                 const visual = categoryVisual(category);
                 return {
                   value: category.id,
-                  label: category.name === 'LOCAL_SPACE' ? 'My reminders' : category.name,
+                  label: category.id === 'LOCAL_SPACE' ? t("ui.my_reminders") : category.name,
                   icon: visual.icon,
                   color: visual.color,
                 };
@@ -1085,21 +1090,21 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
       <div className="mt-6 flex items-center gap-3">
         <AlertDialog.Root>
           <AlertDialog.Trigger asChild>
-            <button type="button" className="danger-icon" aria-label="Delete reminder"><Trash2 size={18} /></button>
+            <button type="button" className="danger-icon" aria-label={t("ui.delete_reminder")}><Trash2 size={18} /></button>
           </AlertDialog.Trigger>
           <AlertDialog.Portal>
             <AlertDialog.Overlay className="dialog-overlay" />
             <AlertDialog.Content className="dialog-content max-w-[420px]">
-              <AlertDialog.Title className="dialog-title">Delete this reminder?</AlertDialog.Title>
-              <AlertDialog.Description className="dialog-description">This removes “{reminder.title}” from Samsung Cloud.</AlertDialog.Description>
+              <AlertDialog.Title className="dialog-title">{t("ui.delete_this_reminder")}</AlertDialog.Title>
+              <AlertDialog.Description className="dialog-description">{t("reminder.deleteDescription", { title: reminder.title })}</AlertDialog.Description>
               <div className="mt-7 flex justify-end gap-3">
-                <AlertDialog.Cancel asChild><button className="secondary-button">Cancel</button></AlertDialog.Cancel>
-                <AlertDialog.Action asChild><button className="delete-button" onClick={() => onDelete(reminder.id)}>Delete</button></AlertDialog.Action>
+                <AlertDialog.Cancel asChild><button className="secondary-button">{t("ui.cancel")}</button></AlertDialog.Cancel>
+                <AlertDialog.Action asChild><button className="delete-button" onClick={() => onDelete(reminder.id)}>{t("ui.delete")}</button></AlertDialog.Action>
               </div>
             </AlertDialog.Content>
           </AlertDialog.Portal>
         </AlertDialog.Root>
-        <button type="button" className="secondary-button px-3" onClick={() => void shareReminder()} aria-label="Share reminder"><Share2 size={17} /></button>
+        <button type="button" className="secondary-button px-3" onClick={() => void shareReminder()} aria-label={t("ui.share_reminder")}><Share2 size={17} /></button>
         <button
           type="button"
           className="primary-button ml-auto min-w-28"
@@ -1125,7 +1130,7 @@ function Inspector({ reminder, categories, onSave, onDelete, saving, open, onClo
           })}
         >
           {saving ? <LoaderCircle size={17} className="animate-spin" /> : null}
-          {saving ? 'Saving' : 'Save'}
+          {saving ? t("ui.saving") : t("ui.save")}
         </button>
       </div>
     </aside>
@@ -1141,6 +1146,7 @@ function CategoryManager({ trigger, categories, counts, busy, onCreate, onUpdate
   onUpdate: (values: { id: string; name: string; color: number; iconIndex: number }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
+  useI18n();
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(6);
@@ -1172,26 +1178,26 @@ function CategoryManager({ trigger, categories, counts, busy, onCreate, onUpdate
         <Dialog.Content className="dialog-content category-manager-dialog">
           <div className="flex items-start justify-between gap-5">
             <div>
-              <Dialog.Title className="dialog-title">Reminder lists</Dialog.Title>
-              <Dialog.Description className="dialog-description">Create and edit the lists synced with Samsung Reminder.</Dialog.Description>
+              <Dialog.Title className="dialog-title">{t("ui.reminder_lists")}</Dialog.Title>
+              <Dialog.Description className="dialog-description">{t("ui.create_and_edit_the_lists_synced_with_samsung_reminder")}</Dialog.Description>
             </div>
-            <Dialog.Close asChild><IconButton label="Close"><X size={19} /></IconButton></Dialog.Close>
+            <Dialog.Close asChild><IconButton label={t("ui.close")}><X size={19} /></IconButton></Dialog.Close>
           </div>
 
           <section className="category-create-panel">
             <div className="category-create-copy">
-              <CategoryIconPicker value={newIconIndex} color={newColor} label="Choose icon for new list" onChange={setNewIconIndex} />
+              <CategoryIconPicker value={newIconIndex} color={newColor} label={t("ui.choose_icon_for_new_list")} onChange={setNewIconIndex} />
               <div>
-                <strong>New list</strong>
-                <span>Choose a name, color, and icon.</span>
+                <strong>{t("ui.new_list")}</strong>
+                <span>{t("ui.choose_a_name_color_and_icon")}</span>
               </div>
             </div>
             <div className="category-create-fields">
-              <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="List name" maxLength={80} onKeyDown={(event) => { if (event.key === 'Enter') void createCategory(); }} />
-              <div className="category-swatches" aria-label="New list color">
+              <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder={t("ui.list_name")} maxLength={80} onKeyDown={(event) => { if (event.key === 'Enter') void createCategory(); }} />
+              <div className="category-swatches" aria-label={t("ui.new_list_color")}>
                 {categoryColorOrder.map((index) => <button type="button" key={index} aria-label={categoryColorName(index)} aria-pressed={newColor === index} style={{ '--swatch': categoryColor(index) } as React.CSSProperties} onClick={() => setNewColor(index)} />)}
               </div>
-              <button type="button" className="primary-button" disabled={!newName.trim() || busy} onClick={() => void createCategory()}>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <Plus size={16} />} Create</button>
+              <button type="button" className="primary-button" disabled={!newName.trim() || busy} onClick={() => void createCategory()}>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <Plus size={16} />} {t("ui.create")}</button>
             </div>
           </section>
 
@@ -1208,19 +1214,19 @@ function CategoryManager({ trigger, categories, counts, busy, onCreate, onUpdate
                   <CategoryIconPicker
                     value={draft.iconIndex}
                     color={draft.color}
-                    label={`Choose icon for ${isDefault ? 'My reminders' : category.name}`}
+                    label={t("category.chooseIcon", { name: isDefault ? t("ui.my_reminders") : category.name })}
                     disabled={isDefault}
                     onChange={(iconIndex) => setDrafts((current) => ({ ...current, [category.id]: { ...draft, iconIndex } }))}
                   />
                   <div className="min-w-0 flex-1">
                     {isDefault ? (
-                      <div className="category-locked-name"><strong>My reminders</strong><span><LockKeyhole size={11} /> Default</span></div>
+                      <div className="category-locked-name"><strong>{t("ui.my_reminders")}</strong><span><LockKeyhole size={11} /> {t("ui.default")}</span></div>
                     ) : (
-                      <input className="category-name-input" value={draft.name} maxLength={80} aria-label={`Name for ${category.name}`} onChange={(event) => setDrafts((current) => ({ ...current, [category.id]: { ...draft, name: event.target.value } }))} />
+                      <input className="category-name-input" value={draft.name} maxLength={80} aria-label={t("category.name", { name: category.name })} onChange={(event) => setDrafts((current) => ({ ...current, [category.id]: { ...draft, name: event.target.value } }))} />
                     )}
-                    <span className="category-count">{count} {count === 1 ? 'reminder' : 'reminders'}</span>
+                    <span className="category-count">{t("reminder.count", { count })}</span>
                     {!isDefault ? (
-                      <div className="category-swatches compact" aria-label={`Color for ${category.name}`}>
+                      <div className="category-swatches compact" aria-label={t("category.color", { name: category.name })}>
                         {categoryColorOrder.map((index) => <button type="button" key={index} aria-label={categoryColorName(index)} aria-pressed={draft.color === index} style={{ '--swatch': categoryColor(index) } as React.CSSProperties} onClick={() => setDrafts((current) => ({ ...current, [category.id]: { ...draft, color: index } }))} />)}
                       </div>
                     ) : null}
@@ -1229,14 +1235,14 @@ function CategoryManager({ trigger, categories, counts, busy, onCreate, onUpdate
                     <div className="category-row-actions">
                       {deleteId === category.id ? (
                         <div className="category-delete-confirm">
-                          <span>Move its reminders to My reminders?</span>
-                          <button type="button" onClick={() => setDeleteId(null)}>Cancel</button>
-                          <button type="button" className="is-danger" disabled={busy} onClick={() => void onDelete(category.id).then(() => setDeleteId(null)).catch(() => undefined)}>Delete</button>
+                          <span>{t("ui.move_its_reminders_to_my_reminders")}</span>
+                          <button type="button" onClick={() => setDeleteId(null)}>{t("ui.cancel")}</button>
+                          <button type="button" className="is-danger" disabled={busy} onClick={() => void onDelete(category.id).then(() => setDeleteId(null)).catch(() => undefined)}>{t("ui.delete")}</button>
                         </div>
                       ) : (
                         <>
-                          <button type="button" className="category-save-button" aria-label={`Save ${category.name}`} disabled={!changed || !draft.name.trim() || busy} onClick={() => void onUpdate({ id: category.id, name: draft.name.trim(), color: draft.color, iconIndex: draft.iconIndex }).catch(() => undefined)}><Save size={16} /></button>
-                          <button type="button" className="category-remove-button" aria-label={`Delete ${category.name}`} disabled={busy} onClick={() => setDeleteId(category.id)}><Trash2 size={16} /></button>
+                          <button type="button" className="category-save-button" aria-label={t("category.save", { name: category.name })} disabled={!changed || !draft.name.trim() || busy} onClick={() => void onUpdate({ id: category.id, name: draft.name.trim(), color: draft.color, iconIndex: draft.iconIndex }).catch(() => undefined)}><Save size={16} /></button>
+                          <button type="button" className="category-remove-button" aria-label={t("category.delete", { name: category.name })} disabled={busy} onClick={() => setDeleteId(category.id)}><Trash2 size={16} /></button>
                         </>
                       )}
                     </div>
@@ -1252,6 +1258,7 @@ function CategoryManager({ trigger, categories, counts, busy, onCreate, onUpdate
 }
 
 function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onDisconnect, onWipe }: SettingsDialogProps) {
+  const { preference, setLanguage } = useI18n();
   const [draftEndpoint, setDraftEndpoint] = useState(endpoint);
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
@@ -1264,33 +1271,34 @@ function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onD
       <Dialog.Overlay className="dialog-overlay" />
       <Dialog.Content className="dialog-content w-[min(540px,calc(100vw-32px))]">
         <div className="flex items-center justify-between">
-          <Dialog.Title className="dialog-title">Settings</Dialog.Title>
-          <Dialog.Close asChild><IconButton label="Close"><X size={19} /></IconButton></Dialog.Close>
+          <Dialog.Title className="dialog-title">{t("ui.settings")}</Dialog.Title>
+          <Dialog.Close asChild><IconButton label={t("ui.close")}><X size={19} /></IconButton></Dialog.Close>
         </div>
-        <Dialog.Description className="dialog-description">Connection, appearance, and MCP access.</Dialog.Description>
+        <Dialog.Description className="dialog-description">{t("ui.connection_appearance_and_mcp_access")}</Dialog.Description>
 
         <div className="mt-7 space-y-6">
+          <section><label className="settings-label">{t("language.label")}</label><OneUiSelect ariaLabel={t("language.label")} value={preference} onChange={(next) => setLanguage(next as 'system' | 'en' | 'ru')} options={[{ value: 'system', label: t("language.system") }, { value: 'ru', label: 'Русский' }, { value: 'en', label: 'English' }]} /></section>
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <label htmlFor="endpoint" className="settings-label">Samsung Browser bridge</label>
+              <label htmlFor="endpoint" className="settings-label">{t("ui.samsung_browser_bridge")}</label>
               <span className={`status-chip ${connected ? 'is-online' : ''}`}>
                 <span className="size-1.5 rounded-full bg-current" />
-                {connected ? 'Connected' : 'Ready on demand'}
+                {connected ? t("ui.connected") : t("ui.ready_on_demand")}
               </span>
             </div>
             <input id="endpoint" className="settings-input" value={draftEndpoint} onChange={(event) => setDraftEndpoint(event.target.value)} />
-            <p className="mt-2 text-xs leading-5 text-muted">The first sync signs in through your existing Samsung Browser profile, securely remembers the session, then closes the browser completely. It signs in again only when Samsung requires it.</p>
+            <p className="mt-2 text-xs leading-5 text-muted">{t("ui.the_first_sync_signs_in_through_your_existing_samsung_browser_profile_securely_remembers_the_session_then_closes_the_browser_completely_it_signs_in_again_only_when_samsung_requires_it")}</p>
             <button className="text-button mt-3" type="button" onClick={() => {
               localStorage.setItem('reminder-cdp-endpoint', draftEndpoint);
               setEndpoint(draftEndpoint);
-            }}>Save endpoint</button>
+            }}>{t("ui.save_endpoint")}</button>
           </section>
 
           <Separator.Root className="h-px bg-line" />
           <section className="flex items-center justify-between">
             <div>
-              <p className="settings-label">Dark appearance</p>
-              <p className="mt-1 text-xs text-muted">Match Samsung Reminder’s deep-black theme.</p>
+              <p className="settings-label">{t("ui.dark_appearance")}</p>
+              <p className="mt-1 text-xs text-muted">{t("ui.match_samsung_reminder_s_deep_black_theme")}</p>
             </div>
             <Switch.Root
               className="switch-root"
@@ -1303,9 +1311,9 @@ function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onD
 
           <Separator.Root className="h-px bg-line" />
           <section>
-            <p className="settings-label">Samsung account on this PC</p>
-            <p className="mt-1 text-xs leading-5 text-muted">Remove the cached Samsung Cloud credential from Windows Credential Manager and return to the connection disclosure.</p>
-            {disconnectError ? <p className="mt-2 text-xs text-danger" role="alert">{disconnectError}</p> : null}
+            <p className="settings-label">{t("ui.samsung_account_on_this_pc")}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">{t("ui.remove_the_cached_samsung_cloud_credential_from_windows_credential_manager_and_return_to_the_connection_disclosure")}</p>
+            {disconnectError ? <p className="mt-2 text-xs text-danger" role="alert">{t(disconnectError)}</p> : null}
             <button
               className="text-button mt-3"
               type="button"
@@ -1314,49 +1322,49 @@ function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onD
                 setDisconnecting(true);
                 setDisconnectError(null);
                 void onDisconnect().catch((error) => {
-                  setDisconnectError(errorMessage(error));
+                  setDisconnectError("error.operation");
                   setDisconnecting(false);
                 });
               }}
             >
-              {disconnecting ? 'Disconnecting…' : 'Disconnect Samsung account'}
+              {disconnecting ? t("ui.disconnecting") : t("ui.disconnect_samsung_account")}
             </button>
           </section>
 
           <Separator.Root className="h-px bg-line" />
           <section>
-            <p className="settings-label">MCP server</p>
-            <p className="mt-1 text-xs leading-5 text-muted">Build the sibling Rust binary with <code>pnpm build:mcp</code>, then add it to Codex.</p>
+            <p className="settings-label">{t("ui.mcp_server")}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">{t("ui.build_the_sibling_rust_binary_with")} <code>pnpm build:mcp</code>{t("ui.then_add_it_to_codex")}</p>
             <div className="mt-3 rounded-[18px] bg-code p-4 font-mono text-[11px] leading-5 text-code-ink">
               <pre className="whitespace-pre-wrap">{mcpConfig}</pre>
             </div>
-            <button className="text-button mt-3" type="button" onClick={() => navigator.clipboard.writeText(mcpConfig)}>Copy configuration</button>
+            <button className="text-button mt-3" type="button" onClick={() => navigator.clipboard.writeText(mcpConfig)}>{t("ui.copy_configuration")}</button>
           </section>
 
           <Separator.Root className="h-px bg-line" />
           <section>
-            <p className="settings-label">Erase all app data</p>
-            <p className="mt-1 text-xs leading-5 text-muted">Remove everything this app stores on this PC and start over from the connection disclosure. Reminders and lists in Samsung Cloud are not deleted.</p>
-            {wipeError ? <p className="mt-2 text-xs text-danger" role="alert">{wipeError}</p> : null}
+            <p className="settings-label">{t("ui.erase_all_app_data")}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">{t("ui.remove_everything_this_app_stores_on_this_pc_and_start_over_from_the_connection_disclosure_reminders_and_lists_in_samsung_cloud_are_not_deleted")}</p>
+            {wipeError ? <p className="mt-2 text-xs text-danger" role="alert">{t(wipeError)}</p> : null}
             <AlertDialog.Root>
               <AlertDialog.Trigger asChild>
                 <button className="wipe-button mt-3" type="button" disabled={wiping}>
-                  <Trash2 size={15} /> {wiping ? 'Erasing…' : 'Erase app data'}
+                  <Trash2 size={15} /> {wiping ? t("ui.erasing") : t("ui.erase_app_data")}
                 </button>
               </AlertDialog.Trigger>
               <AlertDialog.Portal>
                 <AlertDialog.Overlay className="dialog-overlay" />
                 <AlertDialog.Content className="dialog-content max-w-[440px]">
-                  <AlertDialog.Title className="dialog-title">Erase all app data?</AlertDialog.Title>
-                  <AlertDialog.Description className="dialog-description">This resets the app to how it was after installation and removes:</AlertDialog.Description>
+                  <AlertDialog.Title className="dialog-title">{t("ui.erase_all_app_data")}</AlertDialog.Title>
+                  <AlertDialog.Description className="dialog-description">{t("ui.this_resets_the_app_to_how_it_was_after_installation_and_removes")}</AlertDialog.Description>
                   <ul className="mt-4 list-disc space-y-1.5 pl-5 text-[13px] leading-5 text-muted marker:text-muted/60">
-                    <li>The cached Samsung Cloud credential in Windows Credential Manager</li>
-                    <li>Your consent choice for cloud access</li>
-                    <li>Local settings, including the bridge endpoint and appearance</li>
+                    <li>{t("ui.the_cached_samsung_cloud_credential_in_windows_credential_manager")}</li>
+                    <li>{t("ui.your_consent_choice_for_cloud_access")}</li>
+                    <li>{t("ui.local_settings_including_the_bridge_endpoint_and_appearance")}</li>
                   </ul>
-                  <p className="mt-4 text-[13px] leading-5 text-muted">Your reminders stay safe in Samsung Cloud. The app restarts at the connection disclosure.</p>
+                  <p className="mt-4 text-[13px] leading-5 text-muted">{t("ui.your_reminders_stay_safe_in_samsung_cloud_the_app_restarts_at_the_connection_disclosure")}</p>
                   <div className="mt-7 flex justify-end gap-3">
-                    <AlertDialog.Cancel asChild><button className="secondary-button">Cancel</button></AlertDialog.Cancel>
+                    <AlertDialog.Cancel asChild><button className="secondary-button">{t("ui.cancel")}</button></AlertDialog.Cancel>
                     <AlertDialog.Action asChild>
                       <button
                         className="delete-button"
@@ -1364,12 +1372,12 @@ function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onD
                           setWiping(true);
                           setWipeError(null);
                           void onWipe().catch((error) => {
-                            setWipeError(errorMessage(error));
+                            setWipeError("error.operation");
                             setWiping(false);
                           });
                         }}
                       >
-                        Erase and restart
+                        {t("ui.erase_and_restart")}
                       </button>
                     </AlertDialog.Action>
                   </div>
@@ -1384,6 +1392,8 @@ function SettingsDialog({ endpoint, setEndpoint, theme, setTheme, connected, onD
 }
 
 function ReminderApp() {
+  const { language } = useI18n();
+  const categoryDefinitions = getCategoryDefinitions();
   const queryClient = useQueryClient();
   const [category, setCategory] = useState<CategoryId>('all');
   const [search, setSearch] = useState('');
@@ -1419,22 +1429,32 @@ function ReminderApp() {
     refetchOnReconnect: false,
   });
   const collections = useMemo(
-    () => createReminderCollections(queryClient, endpoint, probeQuery.isSuccess),
-    [queryClient, endpoint, probeQuery.isSuccess],
+    () => createReminderCollections(queryClient, endpoint, false),
+    [queryClient, endpoint],
   );
   const remindersLive = useLiveQuery(() => collections.reminders, [collections.reminders]);
   const categoriesLive = useLiveQuery(() => collections.categories, [collections.categories]);
 
+  // A failed connectivity check must not replace the collections and discard
+  // their last successful rows. Explicit refetch also works while disabled.
+  useEffect(() => {
+    if (!probeQuery.isSuccess) return;
+    void Promise.all([
+      collections.reminders.utils.refetch(),
+      collections.categories.utils.refetch(),
+    ]).catch(() => undefined);
+  }, [collections, probeQuery.isSuccess]);
+
   const reminders = remindersLive.data || [];
   const categories = useMemo(() => {
     const received = categoriesLive.data || [];
-    const local = received.find((item) => item.id === 'LOCAL_SPACE') || { id: 'LOCAL_SPACE', name: 'My reminders', color: 0, iconIndex: 0, order: -1, extensionInfo: null };
+    const local = received.find((item) => item.id === 'LOCAL_SPACE') || { id: 'LOCAL_SPACE', name: t("ui.my_reminders"), color: 0, iconIndex: 0, order: -1, extensionInfo: null };
     return [local, ...received.filter((item) => item.id !== 'LOCAL_SPACE').sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))];
-  }, [categoriesLive.data]);
+  }, [categoriesLive.data, language]);
   const customCategoryDefinitions = useMemo(() => categories.map((item) => {
     const visual = categoryVisual(item);
-    return { id: `category:${item.id}`, label: item.name === 'LOCAL_SPACE' ? 'My reminders' : item.name, ...visual };
-  }), [categories]);
+    return { id: `category:${item.id}`, label: item.id === 'LOCAL_SPACE' ? t("ui.my_reminders") : item.name, ...visual };
+  }), [categories, language]);
   const counts = useMemo(() => Object.fromEntries(
     [...categoryDefinitions, ...customCategoryDefinitions]
       .map((definition) => [definition.id, reminders.filter((item) => isInCategory(item, definition.id)).length]),
@@ -1460,7 +1480,7 @@ function ReminderApp() {
       groups.set(label, [...(groups.get(label) || []), reminder]);
     }
     return [...groups.entries()];
-  }, [filtered]);
+  }, [filtered, language]);
   const selected = reminders.find((item) => item.id === selectedId) || null;
 
   useEffect(() => {
@@ -1478,6 +1498,7 @@ function ReminderApp() {
     try {
       const wasConnected = probeQuery.isSuccess;
       const probeResult = await probeQuery.refetch();
+      // The effect owns the initial/recovery load; avoid launching it twice.
       if (!probeResult.isSuccess || !wasConnected) return;
       await Promise.all([
         collections.reminders.utils.refetch(),
@@ -1494,7 +1515,7 @@ function ReminderApp() {
       await transaction.isPersisted.promise;
       setNotice({ message, kind: 'success' });
     } catch (error) {
-      setNotice({ message: errorMessage(error), kind: 'error' });
+      setNotice({ message: "error.operation", kind: 'error' });
       throw error;
     } finally {
       setPendingWrites((count) => Math.max(0, count - 1));
@@ -1515,10 +1536,10 @@ function ReminderApp() {
     const transaction = collections.reminders.insert(reminder);
     setSelectedId(id);
     setQuickTitle('');
-    observeTransaction(transaction, 'Reminder added');
+    observeTransaction(transaction, "ui.reminder_added");
   }
 
-  function updateReminder(values: Record<string, unknown>, message = 'Changes saved') {
+  function updateReminder(values: Record<string, unknown>, message = "ui.changes_saved") {
     const id = String(values.id || '');
     const current = reminders.find((reminder) => reminder.id === id);
     if (!current) return;
@@ -1531,7 +1552,7 @@ function ReminderApp() {
     const transaction = collections.reminders.delete(id);
     setSelectedId(null);
     setDetailsOpen(false);
-    observeTransaction(transaction, 'Reminder deleted');
+    observeTransaction(transaction, "ui.reminder_deleted");
   }
 
   async function disconnectAccount() {
@@ -1559,8 +1580,8 @@ function ReminderApp() {
   }
 
   const categoryLabel = category === 'all'
-    ? 'My reminders'
-    : [...categoryDefinitions, ...customCategoryDefinitions].find((item) => item.id === category)?.label || 'Reminders';
+    ? t("ui.my_reminders")
+    : [...categoryDefinitions, ...customCategoryDefinitions].find((item) => item.id === category)?.label || t("ui.reminders");
   const syncError = probeQuery.error
     || collections.reminders.utils.lastError
     || collections.categories.utils.lastError;
@@ -1578,35 +1599,35 @@ function ReminderApp() {
       <header className="app-header">
         <div className="flex min-w-0 items-center gap-3">
           <div className="app-mark"><Check size={22} strokeWidth={3.2} /></div>
-          <h1 className="truncate text-[25px] font-bold tracking-[-0.04em] text-brand">Reminder</h1>
-          {isPreview ? <span className="preview-chip">Preview</span> : null}
+          <h1 className="truncate text-[25px] font-bold tracking-[-0.04em] text-brand">{t("ui.reminder")}</h1>
+          {isPreview ? <span className="preview-chip">{t("ui.preview")}</span> : null}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <label className="search-box">
             <Search size={17} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reminders" aria-label="Search reminders" />
-            {search ? <button type="button" onClick={() => setSearch('')} aria-label="Clear search"><X size={15} /></button> : null}
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("ui.search_reminders")} aria-label={t("ui.search_reminders")} />
+            {search ? <button type="button" onClick={() => setSearch('')} aria-label={t("ui.clear_search")}><X size={15} /></button> : null}
           </label>
-          <IconButton label="Sync now" onClick={() => void refresh()} className={syncing ? '[&>svg]:animate-spin' : ''}>
+          <IconButton label={t("ui.sync_now")} onClick={() => void refresh()} className={syncing ? '[&>svg]:animate-spin' : ''}>
             <RefreshCw size={18} />
           </IconButton>
           <DropdownMenu.Root>
-            <DropdownMenu.Trigger className="icon-button" aria-label="More options"><EllipsisVertical size={20} /></DropdownMenu.Trigger>
+            <DropdownMenu.Trigger className="icon-button" aria-label={t("ui.more_options")}><EllipsisVertical size={20} /></DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content align="end" sideOffset={8} className="menu-content">
                 <DropdownMenu.Label className="account-menu-summary">
                   <span className="account-menu-avatar"><CircleUserRound size={21} /></span>
                   <span className="account-menu-copy">
-                    <strong>Samsung account</strong>
-                    <span>{probeQuery.data?.accountEmail || (connected ? 'Connected' : 'Not connected')}</span>
+                    <strong>{t("ui.samsung_account")}</strong>
+                    <span>{probeQuery.data?.accountEmail || (connected ? t("ui.connected") : t("ui.not_connected"))}</span>
                   </span>
-                  <span className={`account-status-dot ${connected ? 'is-online' : ''}`} aria-label={connected ? 'Connected' : 'Offline'} />
+                  <span className={`account-status-dot ${connected ? 'is-online' : ''}`} aria-label={connected ? t("ui.connected") : t("ui.offline")} />
                 </DropdownMenu.Label>
                 <DropdownMenu.Separator className="menu-separator" />
                 <CategoryManager
                   trigger={
                     <DropdownMenu.Item className="menu-item" onSelect={(event) => event.preventDefault()}>
-                      <FolderCog size={16} /> Manage categories
+                      <FolderCog size={16} /> {t("ui.manage_categories")}
                     </DropdownMenu.Item>
                   }
                   categories={categories}
@@ -1620,24 +1641,24 @@ function ReminderApp() {
                       order: categories.length,
                       extensionInfo: null,
                     });
-                    await persistTransaction(transaction, 'List created');
+                    await persistTransaction(transaction, "ui.list_created");
                   }}
                   onUpdate={async (values) => {
                     const transaction = collections.categories.update(values.id, (draft) => Object.assign(draft, values));
-                    await persistTransaction(transaction, 'List updated');
+                    await persistTransaction(transaction, "ui.list_updated");
                   }}
                   onDelete={async (id) => {
                     const transaction = collections.categories.delete(id);
-                    await persistTransaction(transaction, 'List deleted');
+                    await persistTransaction(transaction, "ui.list_deleted");
                     if (category === `category:${id}`) setCategory('all');
                   }}
                 />
                 <DropdownMenu.Item className="menu-item" onSelect={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />} {theme === 'dark' ? 'Light appearance' : 'Dark appearance'}
+                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />} {theme === 'dark' ? t("ui.light_appearance") : t("ui.dark_appearance")}
                 </DropdownMenu.Item>
                 <Dialog.Root>
                   <Dialog.Trigger asChild>
-                    <DropdownMenu.Item className="menu-item" onSelect={(event) => event.preventDefault()}><Settings2 size={16} /> Settings</DropdownMenu.Item>
+                    <DropdownMenu.Item className="menu-item" onSelect={(event) => event.preventDefault()}><Settings2 size={16} /> {t("ui.settings")}</DropdownMenu.Item>
                   </Dialog.Trigger>
                   <SettingsDialog
                     endpoint={endpoint}
@@ -1660,10 +1681,10 @@ function ReminderApp() {
           <ScrollArea.Root className="min-h-0 flex-1 overflow-hidden">
             <ScrollArea.Viewport className="size-full">
               <div className="content-stack">
-                <section aria-label="Reminder categories">
+                <section aria-label={t("ui.reminder_categories")}>
                   <div className="mb-4 flex items-baseline justify-between">
-                    <button type="button" onClick={() => setCategory('all')} className="section-title">Categories</button>
-                    <span className="text-xs text-muted">{reminders.filter((item) => !item.completed).length} open</span>
+                    <button type="button" onClick={() => setCategory('all')} className="section-title">{t("ui.categories")}</button>
+                    <span className="text-xs text-muted">{t("reminder.open", { count: reminders.filter((item) => !item.completed).length })}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                     {categoryDefinitions.map((definition) => (
@@ -1702,7 +1723,7 @@ function ReminderApp() {
                   <div className="mb-4 flex items-end justify-between">
                     <div>
                       <h2 className="section-title">{categoryLabel}</h2>
-                      <p className="mt-1 text-xs text-muted">{filtered.length} {filtered.length === 1 ? 'reminder' : 'reminders'}</p>
+                      <p className="mt-1 text-xs text-muted">{t("reminder.count", { count: filtered.length })}</p>
                     </div>
                   </div>
 
@@ -1714,7 +1735,7 @@ function ReminderApp() {
                         <p className="mt-1 text-sm leading-5 text-muted">{syncIssue.detail}</p>
                       </div>
                       <button className="secondary-button" disabled={manualSyncing} onClick={() => void refresh()}>
-                        {manualSyncing ? 'Checking…' : syncIssue.action}
+                        {manualSyncing ? t("ui.checking") : syncIssue.action}
                       </button>
                     </div>
                   ) : loading ? (
@@ -1731,7 +1752,7 @@ function ReminderApp() {
                                 reminder={reminder}
                                 selected={reminder.id === selectedId}
                                 onSelect={() => { setSelectedId(reminder.id); setDetailsOpen(true); }}
-                                onToggle={() => updateReminder({ id: reminder.id, completed: !reminder.completed }, reminder.completed ? 'Reminder reopened' : 'Reminder completed')}
+                                onToggle={() => updateReminder({ id: reminder.id, completed: !reminder.completed }, reminder.completed ? "ui.reminder_reopened" : "ui.reminder_completed")}
                               />
                             ))}
                           </div>
@@ -1741,8 +1762,8 @@ function ReminderApp() {
                   ) : (
                     <div className="empty-state">
                       <Circle size={30} strokeWidth={1.4} />
-                      <p className="mt-3 font-medium text-ink">Nothing here</p>
-                      <p className="mt-1 text-sm text-muted">Add a reminder or choose another category.</p>
+                      <p className="mt-3 font-medium text-ink">{t("ui.nothing_here")}</p>
+                      <p className="mt-1 text-sm text-muted">{t("ui.add_a_reminder_or_choose_another_category")}</p>
                     </div>
                   )}
                 </section>
@@ -1754,11 +1775,11 @@ function ReminderApp() {
           <div className="quick-add-wrap">
             <form className="quick-add" onSubmit={submitQuickAdd}>
               <span className="grid size-9 shrink-0 place-items-center rounded-full text-muted"><Plus size={24} strokeWidth={1.8} /></span>
-              <input id="quick-add" value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder="Add reminder" autoComplete="off" />
+              <input id="quick-add" value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} placeholder={t("ui.add_reminder")} autoComplete="off" />
               {pendingWrites > 0 ? <LoaderCircle size={20} className="animate-spin text-brand" /> : quickTitle.trim() ? (
-                <button type="submit" className="quick-submit" aria-label="Add reminder"><Check size={19} strokeWidth={3} /></button>
+                <button type="submit" className="quick-submit" aria-label={t("ui.add_reminder")}><Check size={19} strokeWidth={3} /></button>
               ) : (
-                <button type="button" className="grid size-9 place-items-center text-muted" aria-label="Voice input unavailable"><Mic size={21} /></button>
+                <button type="button" className="grid size-9 place-items-center text-muted" aria-label={t("ui.voice_input_unavailable")}><Mic size={21} /></button>
               )}
             </form>
           </div>
@@ -1768,7 +1789,7 @@ function ReminderApp() {
           <button
             type="button"
             className="drawer-scrim lg:hidden"
-            aria-label="Close details"
+            aria-label={t("ui.close_details")}
             onClick={() => setDetailsOpen(false)}
           />
         ) : null}
@@ -1786,7 +1807,7 @@ function ReminderApp() {
       {notice ? (
         <div className={`toast ${notice.kind === 'error' ? 'is-error' : ''}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
           {notice.kind === 'error' ? <TriangleAlert size={16} /> : <Check size={15} strokeWidth={3} />}
-          {notice.message.replace(/^[A-Z_]+:\s*/, '')}
+          {t(notice.message)}
         </div>
       ) : null}
     </div>
@@ -1799,6 +1820,7 @@ function ConsentGate({ state, onContinue, onCancel, onReview }: {
   onCancel: () => void;
   onReview: () => void;
 }) {
+  useI18n();
   const [acknowledged, setAcknowledged] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
 
@@ -1828,14 +1850,14 @@ function ConsentGate({ state, onContinue, onCancel, onReview }: {
         <div className="consent-orbit consent-orbit-two" aria-hidden="true" />
         <section className="consent-disabled-card" aria-labelledby="cloud-disabled-title">
           <div className="consent-disabled-icon"><LockKeyhole size={28} strokeWidth={2} /></div>
-          <p className="consent-kicker">Connection cancelled</p>
-          <h1 id="cloud-disabled-title">Cloud access stays off</h1>
+          <p className="consent-kicker">{t("ui.connection_cancelled")}</p>
+          <h1 id="cloud-disabled-title">{t("ui.cloud_access_stays_off")}</h1>
           <p className="consent-disabled-copy">
-            No reminder collections, categories, account probe, browser bootstrap, or Samsung Cloud request has been started.
+            {t("ui.no_reminder_collections_categories_account_probe_browser_bootstrap_or_samsung_cloud_request_has_been_started")}
           </p>
           <div className="consent-disabled-actions">
-            <button type="button" className="consent-button consent-button-secondary" onClick={onReview}>Review disclosure</button>
-            <button type="button" className="consent-button consent-button-quiet" onClick={() => void exitApplication()}>Exit</button>
+            <button type="button" className="consent-button consent-button-secondary" onClick={onReview}>{t("ui.review_disclosure")}</button>
+            <button type="button" className="consent-button consent-button-quiet" onClick={() => void exitApplication()}>{t("ui.exit")}</button>
           </div>
         </section>
       </main>
@@ -1850,65 +1872,65 @@ function ConsentGate({ state, onContinue, onCancel, onReview }: {
         <header className="consent-brand-row">
           <div className="consent-brand">
             <span className="consent-brand-mark"><Check size={20} strokeWidth={3.2} /></span>
-            <span>Reminder</span>
+            <span>{t("ui.reminder")}</span>
           </div>
         </header>
 
         <section className="consent-panel" aria-labelledby="consent-title" aria-describedby="consent-summary">
           <div className="consent-intro">
-            <p className="consent-kicker">Before cloud access</p>
-            <h1 id="consent-title">Know what connects.</h1>
+            <p className="consent-kicker">{t("ui.before_cloud_access")}</p>
+            <h1 id="consent-title">{t("ui.know_what_connects")}</h1>
             <p id="consent-summary">
-              This is an unofficial Samsung Reminder client. It relies on private, undocumented Samsung behavior and is not supported by Samsung.
+              {t("ui.this_is_an_unofficial_samsung_reminder_client_it_relies_on_private_undocumented_samsung_behavior_and_is_not_supported_by_samsung")}
             </p>
 
-            <div className="consent-path" aria-label="How the connection works">
+            <div className="consent-path" aria-label={t("ui.how_the_connection_works")}>
               <article className="consent-path-step">
                 <span className="consent-step-number">01</span>
                 <span className="consent-step-icon"><LogIn size={19} /></span>
                 <div>
-                  <h2>Browser bootstrap</h2>
-                  <p>Starts Samsung Browser hidden on a localhost CDP port and opens its already signed-in Calendar extension.</p>
+                  <h2>{t("ui.browser_bootstrap")}</h2>
+                  <p>{t("ui.starts_samsung_browser_hidden_on_a_localhost_cdp_port_and_opens_its_already_signed_in_calendar_extension")}</p>
                 </div>
               </article>
               <article className="consent-path-step">
                 <span className="consent-step-number">02</span>
                 <span className="consent-step-icon"><LockKeyhole size={19} /></span>
                 <div>
-                  <h2>Temporary credential</h2>
-                  <p>Acquires a temporary Samsung token and stores it in Windows Credential Manager, not in app files.</p>
+                  <h2>{t("ui.temporary_credential")}</h2>
+                  <p>{t("ui.acquires_a_temporary_samsung_token_and_stores_it_in_windows_credential_manager_not_in_app_files")}</p>
                 </div>
               </article>
               <article className="consent-path-step">
                 <span className="consent-step-number">03</span>
                 <span className="consent-step-icon"><CalendarDays size={19} /></span>
                 <div>
-                  <h2>Direct cloud access</h2>
-                  <p>Reads and writes reminders and categories directly in Samsung Cloud, then closes the browser after bootstrap.</p>
+                  <h2>{t("ui.direct_cloud_access")}</h2>
+                  <p>{t("ui.reads_and_writes_reminders_and_categories_directly_in_samsung_cloud_then_closes_the_browser_after_bootstrap")}</p>
                 </div>
               </article>
             </div>
           </div>
 
-          <aside className="consent-decision" aria-label="Risks and privacy">
+          <aside className="consent-decision" aria-label={t("ui.risks_and_privacy")}>
             <div className="consent-risk">
               <span><TriangleAlert size={19} /></span>
               <div>
-                <h2>Unsupported and potentially risky</h2>
-                <p>Samsung can change or block this behavior at any time. Breakage or bugs could affect cloud reminder data or put your Samsung account at risk.</p>
+                <h2>{t("ui.unsupported_and_potentially_risky")}</h2>
+                <p>{t("ui.samsung_can_change_or_block_this_behavior_at_any_time_breakage_or_bugs_could_affect_cloud_reminder_data_or_put_your_samsung_account_at_risk")}</p>
               </div>
             </div>
 
             <div className="consent-privacy">
               <span className="consent-privacy-icon"><CircleUserRound size={20} /></span>
               <div>
-                <p className="consent-privacy-label">Publisher receives no data</p>
-                <p>Your reminders, account details, token, and usage stay between this PC and Samsung Cloud. There is no publisher relay or telemetry.</p>
+                <p className="consent-privacy-label">{t("ui.publisher_receives_no_data")}</p>
+                <p>{t("ui.your_reminders_account_details_token_and_usage_stay_between_this_pc_and_samsung_cloud_there_is_no_publisher_relay_or_telemetry")}</p>
               </div>
             </div>
 
             {isPreview ? (
-              <p className="consent-preview-note"><span>Preview</span> This browser demo uses local sample data only and does not contact Samsung.</p>
+              <p className="consent-preview-note"><span>{t("ui.preview")}</span> {t("ui.this_browser_demo_uses_local_sample_data_only_and_does_not_contact_samsung")}</p>
             ) : null}
 
             <label className="consent-acknowledgement">
@@ -1921,23 +1943,23 @@ function ConsentGate({ state, onContinue, onCancel, onReview }: {
                 }}
               />
               <span className="consent-checkbox" aria-hidden="true"><Check size={14} strokeWidth={3} /></span>
-              <span>I understand this is unofficial and authorize direct access to my Samsung Cloud reminders from this PC.</span>
+              <span>{t("ui.i_understand_this_is_unofficial_and_authorize_direct_access_to_my_samsung_cloud_reminders_from_this_pc")}</span>
             </label>
 
-            {storageError ? <p className="consent-storage-error" role="alert">{storageError}</p> : null}
+            {storageError ? <p className="consent-storage-error" role="alert">{t(storageError)}</p> : null}
 
             <div className="consent-actions">
-              <button type="button" className="consent-button consent-button-quiet" onClick={onCancel}>Cancel</button>
+              <button type="button" className="consent-button consent-button-quiet" onClick={onCancel}>{t("ui.cancel")}</button>
               <button
                 type="button"
                 className="consent-button consent-button-primary"
                 disabled={!acknowledged}
                 onClick={continueToApp}
               >
-                Continue <ChevronRight size={17} />
+                {t("ui.continue")} <ChevronRight size={17} />
               </button>
             </div>
-            <p className="consent-footnote">Your choice is stored locally on this device.</p>
+            <p className="consent-footnote">{t("ui.your_choice_is_stored_locally_on_this_device")}</p>
           </aside>
         </section>
       </div>
@@ -1946,6 +1968,7 @@ function ConsentGate({ state, onContinue, onCancel, onReview }: {
 }
 
 export default function App() {
+  useI18n();
   const [consent, setConsent] = useState<ConsentState>(() => hasStoredConsent() ? 'accepted' : 'pending');
 
   useEffect(() => {
@@ -1965,7 +1988,7 @@ export default function App() {
           setConsent('accepted');
           return null;
         } catch {
-          return 'This choice could not be saved locally. Check the app storage permissions and try again.';
+          return "ui.this_choice_could_not_be_saved_locally_check_the_app_storage_permissions_and_try_again";
         }
       }}
     />

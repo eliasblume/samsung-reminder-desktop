@@ -12,11 +12,11 @@
 
 Files: `src/i18n/core.ts`, `src/i18n/index.ts`, `tests/i18n.test.mjs`.
 
-- [ ] Write tests for catalog presence/completeness, parameters, Russian plurals,
+- [x] Write tests for catalog presence/completeness, parameters, Russian plurals,
   English fallback, system-language resolution, and persisted preference.
-- [ ] Run `node --experimental-strip-types --test tests/i18n.test.mjs`; observe
+- [x] Run `node --experimental-strip-types --test tests/i18n.test.mjs`; observe
   the missing catalog assertion before implementation.
-- [ ] Implement these interfaces:
+- [x] Implement these interfaces:
 
 ```ts
 type LanguagePreference = 'system' | 'en' | 'ru';
@@ -27,20 +27,20 @@ translate(catalogs: Record<string, Catalog>, language: string, key: string, para
 validateCatalog(base: Catalog, translated: Catalog, language: string): string[];
 ```
 
-- [ ] Provide `createLanguageStore(storage, getSystemLanguages)` with
+- [x] Provide `createLanguageStore(storage, getSystemLanguages)` with
   `getPreference`, `getLanguage`, `getSnapshot`, `setPreference`, `subscribe`, and
   `refresh`. Catch unavailable storage while preserving the in-memory preference.
-- [ ] Provide `t`, `formatDate`, `formatNumber`, `getLocale`, and `useI18n`.
+- [x] Provide `t`, `formatDate`, `formatNumber`, `getLocale`, and `useI18n`.
   The hook returns `language`, `preference`, `setLanguage`, `locale`, and `t`.
-- [ ] Rerun tests and commit the independently working core/catalog integration.
+- [x] Rerun tests and commit the independently working core/catalog integration.
 
 ## 2. Complete UI catalogs
 
 Files: `src/App.tsx`, `src/lib/category-icons.ts`, `src/i18n/en.json`, `src/i18n/ru.json`.
 
-- [ ] Extract every authored visible string and accessible label into semantic keys.
-- [ ] Translate all Russian entries, including disclosure and settings dialogs.
-- [ ] Add Settings selection with these values:
+- [x] Extract every authored visible string and accessible label into semantic keys.
+- [x] Translate all Russian entries, including disclosure and settings dialogs.
+- [x] Add Settings selection with these values:
 
 ```ts
 [
@@ -50,21 +50,21 @@ Files: `src/App.tsx`, `src/lib/category-icons.ts`, `src/i18n/en.json`, `src/i18n
 ]
 ```
 
-- [ ] Subscribe top-level UI to `useI18n`; include language in memoized translated
+- [x] Subscribe top-level UI to `useI18n`; include language in memoized translated
   category/group labels. Replace fixed locale formatting with `getLocale()` or
   `formatDate`. Use plural messages for counts.
-- [ ] Preserve stored user content and machine-readable configuration examples.
-- [ ] Run catalog tests, `pnpm typecheck`, and `pnpm build`.
+- [x] Preserve stored user content and machine-readable configuration examples.
+- [x] Run catalog tests, `pnpm typecheck`, and `pnpm build`.
 
 ## 3. Synchronization lifecycle
 
 Files: `src/lib/reminder-collections.ts`, `src/App.tsx`, regression tests.
 
-- [ ] Reproduce the reported rows-to-zero transition in a synthetic isolated page,
+- [x] Reproduce the reported rows-to-zero transition in a synthetic isolated page,
   recording collection identity, subscribers, rows, cache events, and query result.
-- [ ] Add a failing regression for the observed transition and fix its owning layer.
+- [x] Add a failing regression for the observed transition and fix its owning layer.
 - [ ] Verify transient failure retains successfully loaded rows and reports failure.
-- [ ] Verify cleanup cannot delete another live collection's query.
+- [x] Verify cleanup cannot delete another live collection's query.
 
 ## 4. Delivery
 
